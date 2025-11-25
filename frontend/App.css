@@ -1,0 +1,339 @@
+:root {
+  --bg-main: #333232;
+  --bg-surface: #4e4e4e;
+  --bg-surface-alt: #717177;
+  --text-primary: #ffffff;
+  --text-secondary: #cacaca;
+  --accent: #ffffff;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --transition-fast: 0.15s ease-out;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+}
+
+.uber-page {
+  min-height: 100vh;
+  background: var(--bg-main);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 72px;
+}
+
+.uber-container {
+  width: 100%;
+  max-width: 480px;
+  padding: 20px 16px 24px;
+}
+
+.uber-header {
+  margin-bottom: 20px;
+}
+
+.uber-logo {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.search-wrapper {
+  margin-bottom: 24px;
+}
+
+.search-pill {
+  width: 100%;
+  border: none;
+  outline: none;
+  display: flex;
+  align-items: center;
+  padding: 14px 18px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.search-pill:hover {
+  background: #2a2a2c;
+  transform: translateY(-1px);
+}
+
+.search-icon {
+  margin-right: 10px;
+  font-size: 18px;
+}
+
+.search-text {
+  flex: 1;
+  text-align: left;
+}
+
+.uber-section + .uber-section {
+  margin-top: 24px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.card {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.15); /* new border */
+  outline: none;
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.card + .card {
+  margin-top: 10px;
+}
+
+.card:hover {
+  background: #141414;
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.icon-glyph {
+  font-size: 18px;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 2px;
+  color: var(--text-primary);
+}
+
+.card-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.shortcut-add .card-icon {
+  background: #5a5e66;
+}
+
+.shortcut-add .icon-glyph {
+  font-weight: 700;
+}
+
+.service-card .card-title {
+  font-size: 16px;
+}
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #050505f0;
+  border-top: 1px solid #2c2c2e;
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 4px;
+  backdrop-filter: blur(12px);
+}
+
+.bottom-nav::before {
+  content: '';
+  position: absolute;
+  top: -16px;
+  left: 0;
+  right: 0;
+  height: 16px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  pointer-events: none;
+}
+
+.nav-item {
+  flex: 1;
+  max-width: 120px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0 2px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.nav-item-active {
+  color: var(--accent);
+}
+
+.nav-icon {
+  font-size: 18px;
+  margin-bottom: 2px;
+}
+
+.nav-label {
+  font-size: 11px;
+}
+
+/* Account header */
+
+.account-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.account-name {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.rating-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  font-size: 13px;
+}
+
+.account-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #ffffff, #c1c1c1);
+}
+
+/* Quick actions grid */
+
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.quick-card {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.small-icon {
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+}
+
+.quick-card-label {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.quick-card-dot {
+  margin-left: auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #2f81ff;
+}
+
+/* Info cards */
+
+.info-card {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-card-main {
+  flex: 1;
+}
+
+.info-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.info-card-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.info-card-right {
+  margin-left: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.info-card-emoji {
+  font-size: 28px;
+}
+
+/* Safety progress + CO2 */
+
+.safety-progress-ring {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.co2-right {
+  gap: 6px;
+}
+
+.co2-leaf {
+  font-size: 18px;
+}
+
+.co2-value {
+  font-size: 20px;
+  font-weight: 700;
+}
