@@ -13,7 +13,7 @@ Integrate to receipt email system post payment success (or maybe also if cancell
 
 Edit pricing logic to be better suited and how the entire thing works 
 
-Get it to work that if a payment intent is created but app exited (losing session_id), then once user goes back on, it is continued (may not be a problem - continue in background?)
+Get it to work that if a payment intent is created but app exited, it is continued in background and that specific user is sent a receipt and e.g  notification when they go back on
 
 Find a way to store API keys securely and not hardcoded (dependent on what we are using - Azure has its own secrets storage)
 
