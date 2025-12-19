@@ -1,0 +1,7 @@
+Same as in payments, find a way to store API keys securely
+
+edit to use SMTP2GO client instead of raw HTTP and JSON
+
+Integrate with the rest of the system
+
+Edit to allow emails to be sent to numerous users at the same time (may require time.sleep in between each request)

@@ -1,0 +1,20 @@
+
+Integrate fully with frontend with exposed endpoint for webhook (also if using azure - get rid of http server and replace with a proper endpoint)
+
+Add options of inputting card details (no card data stored locally though) or google/apple pay
+
+Add database instead of trips and users dictionary (also each user will have multiple transaction_ids)
+
+Add a system to fully utilise the metadata from receipts within the transaction_ids (maybe store price,tips, transactional_id  within db?)
+
+Consider a system of cancellations and returning money/sending to drivers
+
+Integrate to receipt email system post payment success (or maybe also if cancelled?)
+
+Edit pricing logic to be better suited and how the entire thing works 
+
+Get it to work that if a payment intent is created but app exited (losing session_id), then once user goes back on, it is continued (may not be a problem - continue in background?)
+
+Find a way to store API keys securely and not hardcoded (dependent on what we are using - Azure has its own secrets storage)
+
+Make the code look nicer in general, get it to be atomic - so it can work with numerous users at the same time
