@@ -10,8 +10,8 @@ from validation import (
     UserProfileOut,
 )
 
-SUPABASE_URL = ""
-SUPABASE_ANON_KEY = ""
+SUPABASE_URL = "https://lbirnrtmclxfgavwhcjo.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiaXJucnRtY2x4ZmdhdndoY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4ODkzNDYsImV4cCI6MjA4NjQ2NTM0Nn0.rfkUUmnxgvbOk_aaG8o_jdSa63QdS6zRGRITozRnJwY"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
