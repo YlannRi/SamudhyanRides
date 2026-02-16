@@ -1,0 +1,8 @@
+supabase
+stripe
+email-validator
+fastapi
+uvicorn
+pydantic
+python-dotenv
+requests
