@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import create_client, Client  # pip install supabase
 from pydantic import EmailStr
 
-from validation import (
+from app.accounts.validation import (
     UserProfileCreate,
     UserProfileUpdate,
     UserProfileOut,

@@ -2,7 +2,7 @@ ARG PYTHON_VERSION=3.13
 FROM python:${PYTHON_VERSION}-slim as builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED =1
+    PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y \
     gcc \

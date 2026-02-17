@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import accounts, payments, notifications
+from app.routers import routing
 import uvicorn
 
-app = FastAPI(title="Business Logic - Samudhyan Rides", version  = "1.0.0")
+app = FastAPI(title="Samudhyan Rides - Backend", version  = "1.0.1")
 
 # Configure CORS
 origins = [
@@ -20,9 +20,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(accounts.router, prefix="/accounts", tags=["Accounts"])
-app.include_router(payments.router, prefix="/payments", tags=["Payments"])
-app.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
+#app.include_router(accounts.router, prefix="/accounts", tags=["Accounts"])
+#.include_router(payments.router, prefix="/payments", tags=["Payments"])
+#app.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
+app.include_router(routing.router, prefix="/routing", tags=["Routing"])
 
 
 @app.get("/")
