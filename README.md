@@ -72,16 +72,21 @@ Before running the backend, ensure **Docker Desktop is running**.
 ### 2️⃣ Build & Run the Container
 
 From the project root directory, execute:
+
 `docker compose up --build`
 
 ### 3️⃣ Health Check
 
 Verify that the backend is running correctly
+
 `curl http://localhost:8000/health` 
+
 Alternatively, within the terminal, You will see health checks being performed
 
 ### 4️⃣ Interactive API Documentation
 
 FastAPI provides an interactive docs via your browser at:
+
 [http://localhost:8000/docs](https://localhost:8000/docs)
+
 Which allows to view all endpoints, send test requests and inspect responses
