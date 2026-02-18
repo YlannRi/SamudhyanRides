@@ -23,7 +23,6 @@ business_logic/
 └── ...
 ```
 
----
 
 ### When new libraries are required
 When you use libraries that had to be installed, please add them to `requirements.txt` 
