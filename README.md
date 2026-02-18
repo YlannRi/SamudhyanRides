@@ -25,6 +25,12 @@ business_logic/
 
 ---
 
+### When new libraries are required
+When you use libraries that had to be installed, please add them to `requirements.txt` 
+
+This will mean that it will be installed automatically for everyone whenever a container is rebuilt
+
+
 ### Structure Overview
 
 **`main.py`**
