@@ -1,18 +1,82 @@
-To run the backend, download and install:
-  -Docker Desktop
+# Samudhyan Rides Backend 
 
-During Development:
-  The codebase is structured into business_logic\app\... which contains logic files, routers and a main.py file that runs the routers (found within routers)
-  Files within e.g. business_logic\app\pathfinder contains the logic required for the routing algorithm
-  Routers such as routing.py contains the fastAPI routers whci hare used to provide json output back to the frontend or whatever created the connection
-  Main.py opens up localhost port 8000 for any requests and puts together all the routers so that they work together as intended.
+## Requirements
 
-  For more details, look at Josh's code routers/routing.py, app/pathfinder
+To run the backend locally, download and install:
 
-Testing:
-  Before trying to run the container, Ensure Docker Desktop is running
-  Then run:
-    docker compose up --build      (builds the container and opens the localhost port which can be communicated with)
-    then communicate with container via:
-    curl http://localhost:8000/health       (health check and makes sure it works) or otherwise:
-    open your browser and http://localhost:8000/docs        (for a more interactive interface)
+- **Docker Desktop**  
+  https://www.docker.com/products/docker-desktop/
+
+Ensure Docker Desktop is running before starting the backend.
+
+---
+
+## During Development
+
+The codebase follows a modular structure:
+```
+business_logic/
+└── app/
+├── main.py
+├── routers/
+├── pathfinder/
+└── ...
+```
+
+---
+
+### Structure Overview
+
+**`main.py`**
+
+- FastAPI application entry point  
+- Registers and combines all routers  
+- Starts the server on **localhost:8000**  
+- Responsible for exposing the API
+
+
+**`routers/`**
+
+- Contains FastAPI route definitions  
+- Handles HTTP requests and responses  
+- Returns JSON data to the frontend or API clients
+
+Example:
+
+- `routers/routing.py`
+
+**`pathfinder/`**
+
+- Contains routing and path computation logic  
+- Implements the mathematical / algorithmic components  
+- Pure business logic, independent of FastAPI
+
+For more implementation details, refer to Josh's code:
+
+- `routers/routing.py`
+- `app/pathfinder`
+
+---
+
+## Testing & Running the Backend
+
+### 1️⃣ Start Docker Desktop
+
+Before running the backend, ensure **Docker Desktop is running**.
+
+### 2️⃣ Build & Run the Container
+
+From the project root directory, execute:
+`docker compose up --build`
+
+### 3️⃣ Health Check
+
+Verify that the backend is running correctly
+`curl http://localhost:8000/health` 
+Alternatively, within the terminal, You will see health checks being performed
+
+### 4️⃣ Interactive API Documentation
+
+FastAPI provides an interactive docs via your browser at:
+[http://localhost:8000/docs](https://localhost:8000/docs)
+Which allows to view all endpoints, send test requests and inspect responses
