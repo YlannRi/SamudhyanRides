@@ -1,6 +1,6 @@
 services:
   backend:
-    build: ./business_logic
+    build: ./backend
     image: samudhyan-backend:latest
     container_name: samudhyan_backend
     ports:
@@ -8,4 +8,4 @@ services:
     env_file: .env.dev
     restart: unless-stopped
     volumes:
-      - ./business_logic:/app   
+      - ./backend:/app   

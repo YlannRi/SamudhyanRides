@@ -71,7 +71,7 @@ Before running the backend, ensure **Docker Desktop is running**.
 
 ### 2️⃣ Build & Run the Container
 
-From the backend folder (may require `cd backend`) from main repo, execute:
+From main repo, execute:
 
 `docker compose up --build`
 

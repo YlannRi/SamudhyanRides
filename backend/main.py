@@ -28,7 +28,7 @@ app.include_router(routing.router, prefix="/routing", tags=["Routing"])
 
 @app.get("/")
 def read_root():
-    return {"status": "ok", "service": "business-logic"}
+    return {"status": "ok", "service": "backend"}
 
 @app.get("/health")
 def health():
