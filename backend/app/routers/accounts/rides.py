@@ -1,5 +1,5 @@
-from typing import Optional
-
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel # Add this import
 from app.accounts.database import supabase
 from app.accounts.dependencies import get_current_user
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,20 +7,12 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/rides", tags=["Rides"])
 
-# 1. Define Pydantic Models for JSON Bodies
 class RideCreate(BaseModel):
     origin: str
     destination: str
-    departure_time: str
+    departure_time: datetime
     seats_total: int
 
-class RideUpdate(BaseModel):
-    seats_total: Optional[int] = None
-    status: Optional[str] = None
-    departure_time: Optional[str] = None
-
-
-# Helper: Get internal profile ID from auth ID
 def get_profile_id(auth_user_id: str):
     response = supabase.table("user_profiles") \
         .select("id") \
@@ -32,11 +24,9 @@ def get_profile_id(auth_user_id: str):
 
     return response.data[0]["id"]
 
-
-# POST RIDE (Driver Only) - Now accepts JSON body
 @router.post("/")
 def create_ride(
-    ride: RideCreate,
+    ride: RideCreate, # FastAPI now expects a JSON body matching the model
     current_user: dict = Depends(get_current_user)
 ):
     profile_id = get_profile_id(current_user["sub"])
@@ -55,14 +45,13 @@ def create_ride(
         "driver_id": profile_id,
         "origin": ride.origin,
         "destination": ride.destination,
-        "departure_time": ride.departure_time,
+        "departure_time": ride.departure_time.isoformat(),
         "seats_total": ride.seats_total,
         "seats_available": ride.seats_total,
         "status": "open"
     }).execute()
 
     return {"message": "Ride created", "ride": new_ride.data[0]}
-
 
 # SEARCH RIDES (GET requests should still use query parameters, not JSON bodies)
 @router.get("/")
