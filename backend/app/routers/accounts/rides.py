@@ -1,12 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel # Add this import
 from app.accounts.database import supabase
 from app.accounts.dependencies import get_current_user
 from datetime import datetime
 
 router = APIRouter(prefix="/rides", tags=["Rides"])
 
+class RideCreate(BaseModel):
+    origin: str
+    destination: str
+    departure_time: datetime
+    seats_total: int
 
-# Helper: Get internal profile ID from auth ID
 def get_profile_id(auth_user_id: str):
     response = supabase.table("user_profiles") \
         .select("id") \
@@ -18,14 +23,9 @@ def get_profile_id(auth_user_id: str):
 
     return response.data[0]["id"]
 
-
-#POST RIDE (Driver Only)
 @router.post("/")
 def create_ride(
-    origin: str,
-    destination: str,
-    departure_time: str,
-    seats_total: int,
+    ride: RideCreate, # FastAPI now expects a JSON body matching the model
     current_user: dict = Depends(get_current_user)
 ):
     profile_id = get_profile_id(current_user["sub"])
@@ -40,18 +40,17 @@ def create_ride(
     if not verified.data:
         raise HTTPException(status_code=403, detail="You are not a verified driver")
 
-    ride = supabase.table("rides").insert({
+    new_ride = supabase.table("rides").insert({
         "driver_id": profile_id,
-        "origin": origin,
-        "destination": destination,
-        "departure_time": departure_time,
-        "seats_total": seats_total,
-        "seats_available": seats_total,
+        "origin": ride.origin,
+        "destination": ride.destination,
+        "departure_time": ride.departure_time.isoformat(),
+        "seats_total": ride.seats_total,
+        "seats_available": ride.seats_total,
         "status": "open"
     }).execute()
 
-    return {"message": "Ride created", "ride": ride.data[0]}
-
+    return {"message": "Ride created", "ride": new_ride.data[0]}
 
 #SEARCH RIDES
 @router.get("/")
