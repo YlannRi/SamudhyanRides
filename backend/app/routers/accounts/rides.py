@@ -1,9 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
 from app.accounts.database import supabase
 from app.accounts.dependencies import get_current_user
-from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/rides", tags=["Rides"])
+
+# 1. Define Pydantic Models for JSON Bodies
+class RideCreate(BaseModel):
+    origin: str
+    destination: str
+    departure_time: str
+    seats_total: int
+
+class RideUpdate(BaseModel):
+    seats_total: Optional[int] = None
+    status: Optional[str] = None
+    departure_time: Optional[str] = None
 
 
 # Helper: Get internal profile ID from auth ID
@@ -19,13 +33,10 @@ def get_profile_id(auth_user_id: str):
     return response.data[0]["id"]
 
 
-#POST RIDE (Driver Only)
+# POST RIDE (Driver Only) - Now accepts JSON body
 @router.post("/")
 def create_ride(
-    origin: str,
-    destination: str,
-    departure_time: str,
-    seats_total: int,
+    ride: RideCreate,
     current_user: dict = Depends(get_current_user)
 ):
     profile_id = get_profile_id(current_user["sub"])
@@ -40,20 +51,20 @@ def create_ride(
     if not verified.data:
         raise HTTPException(status_code=403, detail="You are not a verified driver")
 
-    ride = supabase.table("rides").insert({
+    new_ride = supabase.table("rides").insert({
         "driver_id": profile_id,
-        "origin": origin,
-        "destination": destination,
-        "departure_time": departure_time,
-        "seats_total": seats_total,
-        "seats_available": seats_total,
+        "origin": ride.origin,
+        "destination": ride.destination,
+        "departure_time": ride.departure_time,
+        "seats_total": ride.seats_total,
+        "seats_available": ride.seats_total,
         "status": "open"
     }).execute()
 
-    return {"message": "Ride created", "ride": ride.data[0]}
+    return {"message": "Ride created", "ride": new_ride.data[0]}
 
 
-#SEARCH RIDES
+# SEARCH RIDES (GET requests should still use query parameters, not JSON bodies)
 @router.get("/")
 def search_rides(
     origin: str | None = None,
@@ -79,15 +90,15 @@ def search_rides(
     return response.data
 
 
-#GET RIDE DETAILS
+# GET RIDE DETAILS
 @router.get("/{rides_id}")
 def get_ride_details(
-    ride_id: str,
+    rides_id: str,
     current_user: dict = Depends(get_current_user)
 ):
     response = supabase.table("rides") \
         .select("*") \
-        .eq("id", ride_id) \
+        .eq("id", rides_id) \
         .execute()
 
     if not response.data:
@@ -95,18 +106,12 @@ def get_ride_details(
 
     return response.data[0]
 
-# when testing in teh fast api docs thing i have to give it the driver id to fetch the RIDE details
-# not sure how this is actually going to work, gpt said that when the front end calls it will include
-# the id but i dont rlly understand how that worls tbh
 
-
-#UPDATE RIDE (Driver Only)
+# UPDATE RIDE (Driver Only) - Now accepts JSON body
 @router.put("/{ride_id}")
 def update_ride(
     ride_id: str,
-    seats_total: int | None = None,
-    status: str | None = None,
-    departure_time: str | None = None,
+    ride_update: RideUpdate,
     current_user: dict = Depends(get_current_user)
 ):
     profile_id = get_profile_id(current_user["sub"])
@@ -120,25 +125,25 @@ def update_ride(
     if not existing.data:
         raise HTTPException(status_code=403, detail="You cannot edit this ride")
 
-    ride = existing.data[0]
+    ride_data = existing.data[0]
     update_data = {}
 
-    if seats_total is not None:
-        seats_taken = ride["seats_total"] - ride["seats_available"]
+    if ride_update.seats_total is not None:
+        seats_taken = ride_data["seats_total"] - ride_data["seats_available"]
 
-        if seats_total < seats_taken:
+        if ride_update.seats_total < seats_taken:
             raise HTTPException(status_code=400, detail="Cannot reduce below booked seats")
 
-        update_data["seats_total"] = seats_total
-        update_data["seats_available"] = seats_total - seats_taken
+        update_data["seats_total"] = ride_update.seats_total
+        update_data["seats_available"] = ride_update.seats_total - seats_taken
 
-    if status:
-        if status not in ["open", "full", "in_progress", "completed", "cancelled"]:
+    if ride_update.status:
+        if ride_update.status not in ["open", "full", "in_progress", "completed", "cancelled"]:
             raise HTTPException(status_code=400, detail="Invalid ride status")
-        update_data["status"] = status
+        update_data["status"] = ride_update.status
 
-    if departure_time:
-        update_data["departure_time"] = departure_time
+    if ride_update.departure_time:
+        update_data["departure_time"] = ride_update.departure_time
 
     updated = supabase.table("rides") \
         .update(update_data) \
