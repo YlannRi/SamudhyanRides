@@ -4,6 +4,7 @@ from app.accounts.database import supabase
 from app.accounts.dependencies import get_current_user
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from datetime import datetime
 
 router = APIRouter(prefix="/rides", tags=["Rides"])
 
@@ -100,7 +101,7 @@ def get_ride_details(
 @router.put("/{ride_id}")
 def update_ride(
     ride_id: str,
-    ride_update: RideUpdate,
+    ride_update: RideCreate,
     current_user: dict = Depends(get_current_user)
 ):
     profile_id = get_profile_id(current_user["sub"])
