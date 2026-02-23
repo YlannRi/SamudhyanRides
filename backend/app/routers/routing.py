@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, HTTPException, Query
 from app.pathfinder.models import RouteRequest, Coordinate
-from app.pathfinder.service import calculate_route
+from app.pathfinder.service import calculate_route, geocode_address, optimize_route
+from app.accounts.database import supabase
 
 router = APIRouter(prefix="/routing", tags=["routing"])
 
@@ -12,7 +13,6 @@ async def calculate_route_endpoint(request: RouteRequest):
 @router.get("/test-bath-route")
 async def test_bath_route():
     """Test endpoint with Bath coordinates"""
-    from app.pathfinder.models import Coordinate
     test_coordinates = [
         Coordinate(longitude=-2.387101467334169, latitude=51.38371431745675),
         Coordinate(longitude=-2.3811171364634256, latitude=51.3792711152603),
@@ -20,6 +20,59 @@ async def test_bath_route():
         Coordinate(longitude=-2.3486067249777007, latitude=51.389974587447796),
         Coordinate(longitude=-2.3251408055843865, latitude=51.378561560319504),
     ]
-    from app.pathfinder.models import RouteRequest
     route_request = RouteRequest(coordinates=test_coordinates)
     return calculate_route(route_request)
+
+
+
+
+
+# geocde address search
+@router.get("/geocode")
+async def geocode_address_endpoint(q: str = Query(..., description="Address or place name")):
+    return geocode_address(q)
+
+# get ORS GeoJSON route for a ride
+@router.get("/ride/{ride_id}")
+async def get_ride_route(ride_id: str):
+    """
+    Returns an ORS GeoJSON route for the ride.
+    Phase 2: Includes all confirmed booking pickups, optimized for the best path.
+    """
+    # 1. Fetch the ride
+    result = supabase.table("rides").select(
+        "origin_lat, origin_lng, destination_lat, destination_lng"
+    ).eq("id", ride_id).execute()
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Ride not found")
+
+    ride = result.data[0]
+    
+    # Check for missing coords
+    origin = Coordinate(longitude=ride["origin_lng"], latitude=ride["origin_lat"]) if ride["origin_lng"] and ride["origin_lat"] else None
+    destination = Coordinate(longitude=ride["destination_lng"], latitude=ride["destination_lat"]) if ride["destination_lng"] and ride["destination_lat"] else None
+    
+    if not origin or not destination:
+        raise HTTPException(status_code=422, detail="Ride missing coordinate fields.")
+
+    # 2. Fetch confirmed bookings for this ride
+    bookings_res = supabase.table("bookings").select(
+        "pickup_lat, pickup_lng"
+    ).eq("ride_id", ride_id).eq("status", "confirmed").execute()
+
+    pickups = []
+    for b in bookings_res.data:
+        if b["pickup_lat"] and b["pickup_lng"]:
+            pickups.append(Coordinate(longitude=b["pickup_lng"], latitude=b["pickup_lat"]))
+
+    # 3. Determine the waypoints
+    if pickups:
+        # Use ORS /optimize to find the best order for multiple pickups
+        ordered_waypoints = optimize_route(origin, destination, pickups)
+    else:
+        # Just start -> end
+        ordered_waypoints = [origin, destination]
+
+    # 4. Calculate final GeoJSON route
+    return calculate_route(RouteRequest(coordinates=ordered_waypoints))
