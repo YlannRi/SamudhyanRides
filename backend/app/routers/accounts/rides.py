@@ -29,6 +29,64 @@ def get_profile_id(auth_user_id: str):
 
     return response.data[0]["id"]
 
+@router.get("/driver/dashboard")
+def get_driver_dashboard(current_user: dict = Depends(get_current_user)):
+    """
+    Returns all upcoming rides for the driver with nested bookings and passenger profiles.
+    Used for the 'My Rides' / management view.
+    """
+    profile_id = get_profile_id(current_user["sub"])
+    
+    # Fetch the driver's upcoming rides
+    rides_res = supabase.table("rides") \
+        .select("*") \
+        .eq("driver_id", profile_id) \
+        .neq("status", "completed") \
+        .neq("status", "cancelled") \
+        .execute()
+    
+    if not rides_res.data:
+        return []
+    
+    ride_ids = [r["id"] for r in rides_res.data]
+    
+    # 2. Fetch all bookings for these rides
+    bookings_res = supabase.table("bookings") \
+        .select("*") \
+        .in_("ride_id", ride_ids) \
+        .execute()
+        
+    if not bookings_res.data:
+        for ride in rides_res.data:
+            ride["bookings"] = []
+        return rides_res.data
+
+    # 3. Fetch passenger profiles for these bookings
+    passenger_ids = list(set(b["passenger_id"] for b in bookings_res.data))
+    profiles_res = supabase.table("user_profiles") \
+        .select("id, first_name, last_name, university_username, driver_rating, rider_rating") \
+        .in_("id", passenger_ids) \
+        .execute()
+        
+    profiles_by_id = {p["id"]: p for p in profiles_res.data}
+    
+    # 4. Attach profiles to bookings
+    for booking in bookings_res.data:
+        booking["passenger"] = profiles_by_id.get(booking["passenger_id"])
+        
+    # 5. Group bookings onto their respective rides
+    bookings_by_ride = {}
+    for b in bookings_res.data:
+        rid = b["ride_id"]
+        if rid not in bookings_by_ride:
+            bookings_by_ride[rid] = []
+        bookings_by_ride[rid].append(b)
+        
+    for ride in rides_res.data:
+        ride["bookings"] = bookings_by_ride.get(ride["id"], [])
+        
+    return rides_res.data
+
 @router.post("/")
 def create_ride(
     ride: RideCreate, # FastAPI now expects a JSON body matching the model
