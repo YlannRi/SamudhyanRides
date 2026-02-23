@@ -2,6 +2,7 @@ from app.accounts.database import supabase
 from app.accounts.dependencies import get_current_user
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+import re
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -20,6 +21,20 @@ def register(request: RegisterRequest):
     # Restrict to University of Bath emails
     if not request.email.endswith("@bath.ac.uk"):
         raise HTTPException(status_code=400, detail="Only University of Bath emails are allowed.")
+
+    # Check password strength
+    if len(request.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
+    if not (re.search("[a-z]", request.password)):
+        raise HTTPException(status_code=400, detail="Password must contain at least one lowercase letter.")
+    if not (re.search("[A-Z]", request.password)):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter.")
+    if not (re.search("[0-9]", request.password)):
+        raise HTTPException(status_code=400, detail="Password must contain at least one number")
+    if re.search("\s", request.password):
+        raise HTTPException(status_code=400, detail="Password must not contain spaces")
+    if not (re.search("[^a-zA-Z0-9]", request.password)):
+        raise HTTPException(status_code=400, detail="Password must contain a special character.")
 
     try:
         # Create user in Supabase Auth
