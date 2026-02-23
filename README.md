@@ -79,7 +79,7 @@ From main repo, execute:
 
 Verify that the backend is running correctly
 
-`curl http://localhost:8000/health` 
+`curl https://localhost:8000/health` 
 
 Alternatively, within the terminal, You will see health checks being performed
 
@@ -87,6 +87,6 @@ Alternatively, within the terminal, You will see health checks being performed
 
 FastAPI provides an interactive docs via your browser at:
 
-[http://localhost:8000/docs](https://localhost:8000/docs)
+[https://localhost:8000/docs](https://localhost:8000/docs)
 
 Which allows to view all endpoints, send test requests and inspect responses
