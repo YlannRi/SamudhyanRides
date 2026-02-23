@@ -31,7 +31,7 @@ def register(request: RegisterRequest):
         raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter.")
     if not (re.search("[0-9]", request.password)):
         raise HTTPException(status_code=400, detail="Password must contain at least one number")
-    if re.search("\s", request.password):
+    if re.search(r"\s", request.password):
         raise HTTPException(status_code=400, detail="Password must not contain spaces")
     if not (re.search("[^a-zA-Z0-9]", request.password)):
         raise HTTPException(status_code=400, detail="Password must contain a special character.")
