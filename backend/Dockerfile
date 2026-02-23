@@ -14,7 +14,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Final stage
+
 FROM python:${PYTHON_VERSION}-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -26,9 +26,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+
 COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
+
+COPY certs/ ./certs/
 COPY . .
 
 RUN useradd --create-home appuser && chown -R appuser:appuser /app
@@ -37,6 +40,6 @@ USER appuser
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://127.0.0.1:8000/health || exit 1
+    CMD curl -k -f https://127.0.0.1:8000/health || exit 1
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8000 --ssl-keyfile=/app/certs/localhost-key.pem --ssl-certfile=/app/certs/localhost.pem"]
