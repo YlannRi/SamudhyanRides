@@ -11,6 +11,10 @@ router = APIRouter(prefix="/rides", tags=["Rides"])
 class RideCreate(BaseModel):
     origin: str
     destination: str
+    origin_lat: float
+    origin_lng: float
+    destination_lat: float
+    destination_lng: float
     departure_time: datetime
     seats_total: int
 
@@ -46,6 +50,10 @@ def create_ride(
         "driver_id": profile_id,
         "origin": ride.origin,
         "destination": ride.destination,
+        "origin_lat": ride.origin_lat,
+        "origin_lng": ride.origin_lng,
+        "destination_lat": ride.destination_lat,
+        "destination_lng": ride.destination_lng,
         "departure_time": ride.departure_time.isoformat(),
         "seats_total": ride.seats_total,
         "seats_available": ride.seats_total,

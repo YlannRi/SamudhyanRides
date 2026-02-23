@@ -30,6 +30,8 @@ def request_booking(
     pickup_location: str,
     dropoff_location: str,
     price: float,
+    pickup_lat: float | None = None,
+    pickup_lng: float | None = None,
     current_user: dict = Depends(get_current_user)
 ):
     passenger_id = get_profile_id(current_user["sub"])
@@ -55,6 +57,8 @@ def request_booking(
         "passenger_id": passenger_id,
         "pickup_location": pickup_location,
         "dropoff_location": dropoff_location,
+        "pickup_lat": pickup_lat,
+        "pickup_lng": pickup_lng,
         "price": price,
         "status": "pending"
     }).execute()
