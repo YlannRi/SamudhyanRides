@@ -91,7 +91,7 @@ FastAPI provides an interactive docs via your browser at:
 
 Which allows to view all endpoints, send test requests and inspect responses
 
-## Testing & Running the Backend
+## Testing & Running the Frontend
 
 ### 1️⃣ open a different terminal window within your code editor 
 
