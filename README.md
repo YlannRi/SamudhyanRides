@@ -44,3 +44,7 @@ Which allows to view all endpoints, send test requests and inspect responses
 ### 2️⃣ execute the following command:
 
 `npm run dev` - may require `npm install` beforehand to install dependencies
+
+### 3️⃣ Access the frontend
+
+[http://localhost:5173](http://localhost:5173)
