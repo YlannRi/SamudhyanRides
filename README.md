@@ -90,3 +90,11 @@ FastAPI provides an interactive docs via your browser at:
 [https://localhost:8000/docs](https://localhost:8000/docs)
 
 Which allows to view all endpoints, send test requests and inspect responses
+
+## Testing & Running the Backend
+
+### 1️⃣ open a different terminal window within your code editor 
+
+### 2️⃣ execute the following command:
+
+`npm run dev` - may require `npm install` beforehand to install dependencies
