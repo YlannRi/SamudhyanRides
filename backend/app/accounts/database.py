@@ -1,7 +1,10 @@
 from supabase import create_client, Client
 from fastapi import FastAPI
+import os
 
-SUPABASE_URL = "https://lbirnrtmclxfgavwhcjo.supabase.co"
-SUPBASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiaXJucnRtY2x4ZmdhdndoY2pvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDg4OTM0NiwiZXhwIjoyMDg2NDY1MzQ2fQ.-7zKYPf9LugsLJr2pdFmUP6rMpW9uqOeqfRqVLJUeL0"
+
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPBASE_KEY = os.getenv("SUPABASE_KEY")
 
 supabase: Client = create_client(SUPABASE_URL,SUPBASE_KEY)

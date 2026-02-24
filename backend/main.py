@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import routing
-from app.routers.accounts import users, drivers, rides, bookings, payments, ratings, incidents, auth
+from app.routers import routing, users, drivers, rides, bookings, payments, ratings, incidents, auth
 import uvicorn
 
 app = FastAPI(title="Samudhyan Rides - Backend", version  = "1.0.1")
@@ -24,19 +23,19 @@ app.add_middleware(
 #app.include_router(accounts.router, prefix="/accounts", tags=["Accounts"])
 #.include_router(payments.router, prefix="/payments", tags=["Payments"])
 #app.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
-app.include_router(routing.router, prefix="/routing", tags=["Routing"])
+app.include_router(routing.router)
 
-app.include_router(users.router, prefix="/account/users", tags=["Accounts"])
-app.include_router(auth.router, prefix="/account/auth", tags=["Accounts"])
-app.include_router(drivers.router, prefix="/account/drivers", tags=["Accounts"])
-app.include_router(rides.router, prefix="/account/rides", tags=["Accounts"])
+app.include_router(users.router)
+app.include_router(auth.router)
+app.include_router(drivers.router)
+app.include_router(rides.router)
 
 # I need to test all the ones below here and make sure they all work
 
-app.include_router(bookings.router, prefix="/account/booking", tags=["Accounts"])
-app.include_router(payments.router, prefix="/account/payments", tags=["Accounts"])
-app.include_router(ratings.router, prefix="/account/ratings", tags=["Accounts"])
-app.include_router(incidents.router, prefix="/account/incidents", tags=["Accounts"])
+app.include_router(bookings.router)
+app.include_router(payments.router)
+app.include_router(ratings.router)
+app.include_router(incidents.router)
 
 
 @app.get("/")
