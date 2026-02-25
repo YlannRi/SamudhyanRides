@@ -27,23 +27,26 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
     // UI state
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        setSuccessMessage(null);
+        setLoading(true);
 
         if (mode === 'signup') {
             if (!firstName.trim() || !lastName.trim()) {
                 setError('Please provide your first name and last name.');
+                setLoading(false);
                 return;
             }
             if (password !== confirmPassword) {
                 setError('Passwords do not match.');
+                setLoading(false);
                 return;
             }
         }
-
-        setLoading(true);
 
         const endpoint = mode === 'login' ? 'auth/login' : 'auth/register';
 
@@ -61,37 +64,55 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                 };
 
         try {
-            // Backend may not be wired up yet. Try it, but allow a graceful fallback.
-            let data: any = null;
-            try {
-                data = await apiFetch<any>(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                    auth: false,
-                });
-            } catch (apiErr) {
-                console.warn('Auth API unreachable, falling back to local prototype flow:', apiErr);
+            const data = await apiFetch<any>(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                auth: false,
+            });
+
+
+            if (mode === 'login') {
+                if (data.access_token || data.token) {
+                    localStorage.setItem('authToken', data.access_token || data.token);
+                    if (onAuthSuccess) onAuthSuccess();
+                } else {
+                    throw new Error('Invalid login credentials.');
+                }
             }
+          
+            else {
 
-            const token = data?.access_token || data?.token;
-            if (token) localStorage.setItem('authToken', token);
+                localStorage.removeItem('authToken');
 
-            if (mode === 'signup' && signupAsDriver) {
-                onStartDriverSignup?.({
-                    firstName: firstName.trim(),
-                    middleNames: middleNames.trim(),
-                    lastName: lastName.trim(),
-                    emailOrUsername: emailOrUsername.trim(),
-                });
-                return;
+
+                setEmailOrUsername('');
+                setPassword('');
+                setConfirmPassword('');
+                setFirstName('');
+                setMiddleNames('');
+                setLastName('');
+                setSignupAsDriver(false);
+
+
+                if (signupAsDriver) {
+                    setSuccessMessage('Account created! Driver signup started.');
+                    onStartDriverSignup?.({
+                        firstName: firstName.trim(),
+                        middleNames: middleNames.trim(),
+                        lastName: lastName.trim(),
+                        emailOrUsername: emailOrUsername.trim(),
+                    });
+                    return;
+                }
+
+
+                setSuccessMessage(data.message || 'Account created! Please check your email to verify and log in.');
+                setMode('login');
             }
-
-            onAuthSuccess?.();
-        } catch (err: unknown) {
+        } catch (err: any) {
             console.error('Auth error:', err);
-            if (err instanceof Error) setError(err.message);
-            else setError('An unexpected error occurred.');
+            setError(err.message || 'An unexpected error occurred.');
         } finally {
             setLoading(false);
         }
@@ -124,6 +145,19 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                     <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '12px' }}>
                         {error}
                     </p>
+                )}
+
+                {successMessage && (
+                    <div style={{
+                        padding: '12px',
+                        backgroundColor: 'rgba(34,197,94,0.15)',
+                        color: '#4ade80',
+                        borderRadius: '8px',
+                        marginBottom: '16px',
+                        fontSize: '14px'
+                    }}>
+                        {successMessage}
+                    </div>
                 )}
 
                 <form onSubmit={handleSubmit}>
