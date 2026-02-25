@@ -16,10 +16,7 @@ const HomePage: React.FC<HomePageProps> = ({ onRequestRide, onPostRide, canUseDr
         <div className="uber-logo">SamudhyanRides</div>
 
         <div className="top-toggle">
-          <button
-            className={`toggle-tab ${mode === 'user' ? 'toggle-tab-active' : ''}`}
-            onClick={() => setMode('user')}
-          >
+          <button className={`toggle-tab ${mode === 'user' ? 'toggle-tab-active' : ''}`} onClick={() => setMode('user')}>
             Rides
           </button>
           <button
@@ -47,9 +44,7 @@ const HomePage: React.FC<HomePageProps> = ({ onRequestRide, onPostRide, canUseDr
           }}
         >
           <span className="search-icon">🔍</span>
-          <span className="search-text">
-            {mode === 'user' ? 'Request a ride' : canUseDriverMode ? 'Post a ride' : 'Become a driver'}
-          </span>
+          <span className="search-text">{mode === 'user' ? 'Request a ride' : canUseDriverMode ? 'Post a ride' : 'Become a driver'}</span>
         </button>
       </div>
     </>

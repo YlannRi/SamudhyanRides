@@ -789,8 +789,15 @@ const TripSection: React.FC<TripSectionProps> = ({
 // - Refresh after actions
 
 // Putting trip sections altogether with titles
-const ActivityPage: React.FC = () => {
+type ActivityPageProps = {
+  canUseDriverMode: boolean;
+  onDriverSignup: () => void;
+};
+const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverSignup }) => {
   const [mode, setMode] = useState<'user' | 'Driver'>('user');
+  React.useEffect(() => {
+  if (!canUseDriverMode && mode === 'Driver') setMode('user');
+}, [canUseDriverMode, mode]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
 
   const [bookings, setBookings] = useState<Trip[]>([]);
@@ -904,7 +911,15 @@ const ActivityPage: React.FC = () => {
         <h1 className="activity-title">Activity</h1>
         <div className="top-toggle">
           <button className={`toggle-tab ${mode === 'user' ? 'toggle-tab-active' : ''}`} onClick={() => setMode('user')}>Rider</button>
-          <button className={`toggle-tab ${mode === 'Driver' ? 'toggle-tab-active' : ''}`} onClick={() => setMode('Driver')}>Driver</button>
+          <button
+  className={`toggle-tab ${mode === 'Driver' ? 'toggle-tab-active' : ''}`}
+  onClick={() => {
+    if (!canUseDriverMode) return onDriverSignup();
+    setMode('Driver');
+  }}
+>
+  Driver
+</button>
         </div>
       </header>
 
