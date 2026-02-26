@@ -199,6 +199,27 @@ def get_my_driver_status(current_user: dict = Depends(get_current_user)):
 
     return {"is_driver": is_driver, "verification": record}
 
+@router.get("/me")
+def get_my_driver_profile(current_user: dict = Depends(get_current_user)):
+    """Return the current user's driver verification profile (if any).
+
+    Used by the frontend settings page to display driver-specific information.
+    """
+    profile_id = get_profile_id(current_user["sub"])
+
+    verification = (
+        supabase.table("driver_verification")
+        .select("*")
+        .eq("driver_id", profile_id)
+        .limit(1)
+        .execute()
+    )
+
+    if not verification.data:
+        raise HTTPException(status_code=404, detail="Driver profile not found")
+
+    return verification.data[0]
+
 @router.get("/")
 def get_all_drivers(current_user: dict = Depends(get_current_user)):
     verified = supabase.table("driver_verification").select("driver_id").eq("verified", True).execute()

@@ -1,8 +1,12 @@
 // Fixed: map-based pickup selection + booking request flow
-
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiFetch } from './lib/api';
 import { RideRenderMap } from './components/Map/RideRenderMap';
+
+export type RequestRidePrefill = {
+  destination?: string;
+  arrivalDateTimeLocal?: string; // yyyy-mm-ddThh:mm
+};
 
 type Ride = {
   id: number;  
@@ -13,8 +17,7 @@ type Ride = {
   price?: string;
 };
 
-const RequestRidePage: React.FC = () => {
-  const [rides, setRides] = useState<Ride[]>([]);
+const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }) => {  const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,6 +27,18 @@ const RequestRidePage: React.FC = () => {
   const [originInput, setOriginInput] = useState('');
   const [destinationInput, setDestinationInput] = useState('');
   const [timeInput, setTimeInput] = useState('');
+
+  useEffect(() => {
+    if (!prefill) return;
+
+    if (prefill.destination) {
+      setDestinationInput(prefill.destination);
+    }
+
+    if (prefill.arrivalDateTimeLocal) {
+      setTimeInput(prefill.arrivalDateTimeLocal);
+    }
+  }, [prefill]);
 
   // Booking flow
   const [selectedRide, setSelectedRide] = useState<Ride | null>(null);

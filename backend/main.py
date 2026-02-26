@@ -1,11 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import routing, users, drivers, rides, bookings, payments, ratings, incidents, auth
+from app.routers import routing, users, drivers, rides, bookings, payments, ratings, incidents, auth, timetable
 import uvicorn
 
 app = FastAPI(title="Samudhyan Rides - Backend", version  = "1.0.1")
 
-# Configure CORS
 origins = [
     "http://localhost:3000",
     "http://localhost:5173",
@@ -20,9 +19,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#app.include_router(accounts.router, prefix="/accounts", tags=["Accounts"])
-#.include_router(payments.router, prefix="/payments", tags=["Payments"])
-#app.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
 app.include_router(routing.router)
 
 app.include_router(users.router)
@@ -30,13 +26,12 @@ app.include_router(auth.router)
 app.include_router(drivers.router)
 app.include_router(rides.router)
 
-# I need to test all the ones below here and make sure they all work
+app.include_router(timetable.router)
 
 app.include_router(bookings.router)
 app.include_router(payments.router)
 app.include_router(ratings.router)
 app.include_router(incidents.router)
-
 
 @app.get("/")
 def read_root():

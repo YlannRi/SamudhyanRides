@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import './App.css';
 import HomePage from './HomePage';
 import AccountPage from './AccountPage';
@@ -8,9 +8,12 @@ import ActivityPage from './ActivityPage';
 import RequestRidePage from './RequestRidePage';
 import PostRidePage from './PostRidePage';
 import JourneyPage from './JourneyPage';
+import SettingsPage from './SettingsPage';
 import { apiFetch } from './lib/api';
+import TimetablePage, { type RidePrefill } from './TimetablePage';
+import SafetyCheckupPage from './SafetyCheckupPage.tsx';
 
-type Tab = 'home' | 'journey' | 'activity' | 'account' | 'request' | 'post';
+type Tab = 'home' | 'journey' | 'activity' | 'account' | 'settings' | 'request' | 'post' | 'timetable' | 'safety';
 
 export const MapPlaceholder: React.FC<{ label?: string }> = ({ label = 'Map Preview' }) => (
   <div className="map-placeholder">
@@ -142,6 +145,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authScreen, setAuthScreen] = useState<'login' | 'driverSignup'>('login');
+  const [requestRidePrefill, setRequestRidePrefill] = useState<RidePrefill | undefined>(undefined);
 
   // Driver-gating
   const [canUseDriverMode, setCanUseDriverMode] = useState<boolean>(true);
@@ -161,12 +165,6 @@ const App: React.FC = () => {
   const handleAuthSuccess = () => {
     setIsAuthenticated(true);
   };
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    refreshDriverStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
 
   const handleLogout = () => {
     localStorage.removeItem('authToken'); // Clear the token
@@ -203,14 +201,18 @@ const App: React.FC = () => {
       case 'home':
         return (
           <HomePage
-            onRequestRide={() => setActiveTab('request')}
+            onRequestRide={(prefill) => {
+              setRequestRidePrefill(prefill);
+              setActiveTab('request');
+            }}
             onPostRide={() => goToDriverTab('post')}
             canUseDriverMode={canUseDriverMode}
             onDriverSignup={() => startDriverSignup('post')}
+            onOpenTimetable={() => setActiveTab('timetable')}
           />
         );
       case 'request':
-        return <RequestRidePage />;
+        return <RequestRidePage prefill={requestRidePrefill} />;
       case 'post':
         // Extra safety: if a non-driver somehow lands here, gate them.
         if (!canUseDriverMode) {
@@ -231,8 +233,19 @@ const App: React.FC = () => {
         }
         return <PostRidePage />;
       case 'account':
-        // Pass the handler to the AccountPage
-        return <AccountPage onLogout={handleLogout} />;
+                return (
+          <AccountPage
+            onLogout={handleLogout}
+            onOpenSettings={() => setActiveTab('settings')}
+            onOpenTimetable={() => setActiveTab('timetable')}
+            onOpenSafetyCheckup={() => setActiveTab('safety')}
+          />
+        );
+      case 'safety':
+        return <SafetyCheckupPage onBack={() => setActiveTab('account')} />;
+
+      case 'settings':
+        return <SettingsPage onBack={() => setActiveTab('account')} />;
       case 'journey':
         return (
           <JourneyPage
@@ -247,6 +260,16 @@ const App: React.FC = () => {
             onDriverSignup={() => startDriverSignup('activity')}
           />
         );
+      case 'timetable':
+        return (
+          <TimetablePage
+            onBack={() => setActiveTab('account')}
+            onSelectEvent={(prefill) => {
+              setRequestRidePrefill(prefill);
+              setActiveTab('request');
+            }}
+          />
+        );
       default:
         return (
           <HomePage
@@ -254,6 +277,7 @@ const App: React.FC = () => {
             onPostRide={() => goToDriverTab('post')}
             canUseDriverMode={canUseDriverMode}
             onDriverSignup={() => startDriverSignup('post')}
+            onOpenTimetable={() => setActiveTab('timetable')}
           />
         );
     }

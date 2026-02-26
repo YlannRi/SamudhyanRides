@@ -29,10 +29,22 @@ type InfoCardProps = {
   title: string;
   subtitle?: string;
   right?: React.ReactNode;
+  onClick?: () => void;
 };
 
-const InfoCard: React.FC<InfoCardProps> = ({ title, subtitle, right }) => (
-  <div className="card info-card">
+
+const InfoCard: React.FC<InfoCardProps> = ({ title, subtitle, right, onClick }) => (
+  <div
+    className="card info-card"
+    onClick={onClick}
+    role={onClick ? 'button' : undefined}
+    tabIndex={onClick ? 0 : undefined}
+    style={onClick ? { cursor: 'pointer' } : undefined}
+    onKeyDown={(e) => {
+      if (!onClick) return;
+      if (e.key === 'Enter' || e.key === ' ') onClick();
+    }}
+  >
     <div className="info-card-main">
       <div className="info-card-title">{title}</div>
       {subtitle && <div className="info-card-subtitle">{subtitle}</div>}
@@ -43,11 +55,45 @@ const InfoCard: React.FC<InfoCardProps> = ({ title, subtitle, right }) => (
 
 type AccountPageProps = {
   onLogout: () => void;
+  onOpenSettings: () => void;
+  onOpenTimetable: () => void;
+  onOpenSafetyCheckup: () => void;
 };
 
-const AccountPage: React.FC<AccountPageProps> = ({ onLogout }) => {
+const AccountPage: React.FC<AccountPageProps> = ({ onLogout, onOpenSettings, onOpenTimetable, onOpenSafetyCheckup }) => {  
   const [userName, setUserName] = useState<string>('Loading...');
   const [rating, setRating] = useState<number | string>('...');
+
+  const [showSafetyToolkit, setShowSafetyToolkit] = useState(false);
+
+  type TrustedContact = {
+    id: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    address?: string;
+    email?: string;
+    isPrimary?: boolean;
+  };
+
+  const getPrimaryTrustedContact = (): TrustedContact | null => {
+    try {
+      const raw = localStorage.getItem('trustedContacts');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return null;
+
+      const primary = parsed.find((c: TrustedContact) => c?.isPrimary);
+      return (primary || parsed[0]) ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const callNumber = (phone: string) => {
+    // Works on mobile; on desktop it may just do nothing (expected)
+    window.location.href = `tel:${phone.replace(/\s+/g, '')}`;
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -114,9 +160,13 @@ const AccountPage: React.FC<AccountPageProps> = ({ onLogout }) => {
       </header>
 
       <div className="quick-actions-grid">
-        <QuickActionCard emoji="⚙" label="Settings" />
+        <QuickActionCard emoji="⚙" label="Settings" onClick={onOpenSettings} />
         <QuickActionCard emoji="➜" label="Logout" onClick={handleLogoutClick} />
-        <QuickActionCard emoji="⚠️" label="Safety Alarm" style={{ color: '#ff5555' }} />
+        <QuickActionCard 
+        emoji="⚠️" 
+        label="Safety Alarm" 
+        style={{ color: '#ff5555' }} 
+        onClick={() => setShowSafetyToolkit(true)} />
         <QuickActionCard emoji="✉" label="Inbox" hasDot />
       </div>
 
@@ -124,6 +174,7 @@ const AccountPage: React.FC<AccountPageProps> = ({ onLogout }) => {
         title="Your timetable"
         subtitle="See and manage your upcoming rides for uni."
         right={<span className="info-card-emoji">📅</span>}
+        onClick={onOpenTimetable}
       />
 
       <InfoCard
@@ -131,10 +182,53 @@ const AccountPage: React.FC<AccountPageProps> = ({ onLogout }) => {
         subtitle="Learn ways to make rides safer."
         right={
           <div className="safety-progress">
-            <span className="safety-progress-ring">1/6</span>
+            <span className="safety-progress-ring">1/5</span>
           </div>
         }
+        onClick={onOpenSafetyCheckup}
       />
+    {showSafetyToolkit && (() => {
+  const primary = getPrimaryTrustedContact();
+
+  return (
+    <div className="modal-backdrop" onClick={() => setShowSafetyToolkit(false)}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 10 }}>Safety Toolkit</div>
+
+        <div style={{ color: 'rgba(255,255,255,0.75)', lineHeight: 1.5, marginBottom: 14 }}>
+          Choose who to contact.
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button className="sheet-action-btn btn-cancel" onClick={() => callNumber('999')}>
+            Call 999
+          </button>
+
+          <button
+            className="sheet-action-btn btn-accept"
+            onClick={() => {
+              if (!primary) return;
+              callNumber(primary.phone);
+            }}
+            disabled={!primary}
+            style={{ opacity: primary ? 1 : 0.55 }}
+            title={!primary ? 'Add a trusted contact in Safety check-up first' : undefined}
+          >
+            Call your trusted contact{primary ? ` (${primary.firstName} ${primary.lastName})` : ''}
+          </button>
+
+          <button className="sheet-action-btn btn-message" onClick={() => callNumber('01225 383999')}>
+            Call campus security (01225 383999)
+          </button>
+
+          <button className="sheet-action-btn btn-message" onClick={() => setShowSafetyToolkit(false)}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+})()}
     </>
   );
 };
