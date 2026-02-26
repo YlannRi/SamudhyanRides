@@ -201,10 +201,10 @@ const ConfirmUI: React.FC<{
 type ModalState =
   | { type: 'rating'; target: { name: string; role: 'driver' | 'passenger' } }
   | { type: 'report' }
-  | { type: 'cancel'; title: string; body: string }
-  | { type: 'accept'; passengerName: string }
-  | { type: 'deny'; passengerName: string }
-  | { type: 'remove'; passengerName: string }
+  | { type: 'cancel'; title: string; body: string; actionType: 'cancelBooking' | 'cancelRide'; targetId: number }
+  | { type: 'accept'; passengerName: string; bookingId: number }
+  | { type: 'deny'; passengerName: string; bookingId: number }
+  | { type: 'remove'; passengerName: string; bookingId: number }
   | { type: 'success'; icon: string; title: string; sub: string }
   | { type: 'start'; title: string; body: string };
 
@@ -266,7 +266,13 @@ const Modal: React.FC<{
             icon="🚫" iconColor="#f87171"
             title={inner.title} body={inner.body}
             confirmLabel="Yes, Cancel" confirmCls="btn-confirm-cancel"
-            onConfirm={() => succeed('🚫', 'Trip Cancelled', 'Your trip has been cancelled successfully')}
+            onConfirm={async () => {
+              if (onConfirmAction) {
+                const ok = await onConfirmAction();
+                if (!ok) return;
+              }
+              succeed('🚫', 'Trip Cancelled', 'Your trip has been cancelled successfully');
+            }}
             onClose={onClose}
           />
         ) : inner.type === 'start' ? (
@@ -283,7 +289,13 @@ const Modal: React.FC<{
             icon="🏁" iconColor="#f87171"
             title={inner.title} body={inner.body}
             confirmLabel="Yes, Start" confirmCls="btn-confirm-accept"
-            onConfirm={() => succeed('🏁', 'Trip Started', 'Your trip has started successfully')}
+            onConfirm={async () => {
+              if (onConfirmAction) {
+                const ok = await onConfirmAction();
+                if (!ok) return;
+              }
+              succeed('🏁', 'Trip Started', 'Your trip has started successfully');
+            }}
             onClose={onClose}
           />
         ) : inner.type === 'accept' ? (
@@ -341,11 +353,17 @@ const Modal: React.FC<{
             // - Update seat availability
             // - Notify passenger
             // - refund?
-            icon="🗑️" iconColor="#f87171"
+            icon="🗑" iconColor="#f87171"
             title={`Remove ${inner.passengerName}?`}
             body={`${inner.passengerName} will be removed from your trip and notified.`}
             confirmLabel="Remove Passenger" confirmCls="btn-confirm-cancel"
-            onConfirm={() => succeed('🗑️', 'Passenger Removed', `${inner.passengerName} has been removed from your trip`)}
+            onConfirm={async () => {
+              if (onConfirmAction) {
+                const ok = await onConfirmAction();
+                if (!ok) return;
+              }
+              succeed('🗑️', 'Passenger Removed', `${inner.passengerName} has been removed from your trip`);
+            }}
             onClose={onClose}
           />
         ) : null}
@@ -357,7 +375,7 @@ const Modal: React.FC<{
 
 
 
-// Passenger Carousel - when driver views past and upcoming users at bottom 
+// Passenger Carousel - when driver views past and upcoming users at bottom
 type Passenger = {
   id: number;
   name: string;
@@ -375,6 +393,16 @@ const PassengerCarousel: React.FC<{
   onRemovePassenger?: (p: Passenger) => void;
 }> = ({ passengers, isPast, onRatePassenger, onRemovePassenger }) => {
   const [idx, setIdx] = useState(0);
+
+  // ADD THIS EARLY RETURN CHECK
+  if (!passengers || passengers.length === 0) {
+    return (
+      <div className="passenger-card" style={{ display: 'flex', justifyContent: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '14px' }}>
+        No passengers yet.
+      </div>
+    );
+  }
+
   const p = passengers[idx];
   const total = passengers.length;
 
@@ -419,7 +447,6 @@ const PassengerCarousel: React.FC<{
               {!p.rated && (
                 <Btn cls="btn-rate" icon={Icons.star} label="Rate" small onClick={() => onRatePassenger?.(p)} />
               )}
-
             </>
           ) : (
             <Btn cls="btn-cancel" icon={Icons.remove} label="Remove" small onClick={() => onRemovePassenger?.(p)} />
@@ -444,25 +471,39 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
   // Called when action is confirmed + success shown — dismiss modal then sheet
   const doneModal = () => { setModal(null); close(); };
 
-  const handleAction = async (type: 'accept' | 'deny', passengerId: number) => {
+  const handleAction = async (type: 'accept' | 'deny' | 'cancelBooking' | 'removePassenger' | 'cancelRide', targetId: number) => {
     try {
       const token = localStorage.getItem('authToken');
       if (!token) throw new Error("No token found");
 
-      // PUT /account/booking/bookings/{booking_id}/accept
-      // DELETE /account/booking/bookings/{booking_id}
-      const endpoint = type === 'accept'
-        ? `https://localhost:8000/bookings/${passengerId}/accept`
-        : `https://localhost:8000/bookings/${passengerId}`;
+      let endpoint = '';
+      let method = 'DELETE';
+
+      switch (type) {
+        case 'accept':
+          endpoint = `https://localhost:8000/bookings/${targetId}/accept`;
+          method = 'PUT';
+          break;
+        case 'deny':
+        case 'cancelBooking':
+        case 'removePassenger':
+          endpoint = `https://localhost:8000/bookings/${targetId}`;
+          method = 'DELETE';
+          break;
+        case 'cancelRide':
+          endpoint = `https://localhost:8000/rides/${targetId}`;
+          method = 'DELETE';
+          break;
+      }
 
       const response = await fetch(endpoint, {
-        method: type === 'accept' ? 'PUT' : 'DELETE',
+        method,
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      if (!response.ok) throw new Error(`${type === 'accept' ? 'Accept' : 'Deny'} failed`);
+      if (!response.ok) throw new Error(`${type} failed`);
 
       return true;
     } catch (err) {
@@ -500,7 +541,9 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
                 onClick={() => openModal({
                   type: 'cancel',
                   title: 'Cancel this trip?',
-                  body: 'Are you sure you want to cancel your upcoming trip? The driver will be notified.'
+                  body: 'Are you sure you want to cancel your upcoming trip? The driver will be notified.',
+                  actionType: 'cancelBooking',
+                  targetId: trip.id
                 })} />
             </div>
           </>
@@ -523,7 +566,9 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
                 onClick={() => openModal({
                   type: 'cancel',
                   title: 'Cancel this request?',
-                  body: 'Are you sure you want to cancel your trip request? The driver will be notified.'
+                  body: 'Are you sure you want to cancel your trip request? The driver will be notified.',
+                  actionType: 'cancelBooking',
+                  targetId: trip.id
                 })} />
             </div>
           </>
@@ -573,14 +618,16 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
             <PassengerCarousel
               passengers={passengers}
               isPast={false}
-              onRemovePassenger={(p) => openModal({ type: 'remove', passengerName: p.name })}
+              onRemovePassenger={(p) => openModal({ type: 'remove', passengerName: p.name, bookingId: p.id })}
             />
             <div className="sheet-actions" style={{ marginTop: 12 }}>
               <Btn cls="btn-cancel" icon={Icons.cancel} label="Cancel Whole Trip"
                 onClick={() => openModal({
                   type: 'cancel',
                   title: 'Cancel whole trip?',
-                  body: 'This will cancel your trip for all passengers. Everyone will be notified.'
+                  body: 'This will cancel your trip for all passengers. Everyone will be notified.',
+                  actionType: 'cancelRide',
+                  targetId: trip.ride_id!
                 })} />
             </div>
             <div className="sheet-actions" style={{ marginTop: 12 }}>
@@ -611,9 +658,9 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
             <div className="sheet-actions">
               <Btn cls="btn-message" icon={Icons.message} label="Message Passenger" />
               <Btn cls="btn-accept" icon={Icons.accept} label="Accept Request"
-                onClick={() => openModal({ type: 'accept', passengerName: trip.username ?? 'Passenger' })} />
+                onClick={() => openModal({ type: 'accept', passengerName: trip.username ?? 'Passenger', bookingId: trip.id })} />
               <Btn cls="btn-cancel" icon={Icons.cancel} label="Deny Request"
-                onClick={() => openModal({ type: 'deny', passengerName: trip.username ?? 'Passenger' })} />
+                onClick={() => openModal({ type: 'deny', passengerName: trip.username ?? 'Passenger', bookingId: trip.id })} />
             </div>
           </>
         );
@@ -685,8 +732,13 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
           onDone={doneModal}
           onConfirmAction={async () => {
             if (modal.type === 'accept' || modal.type === 'deny') {
-              const success = await handleAction(modal.type, trip.id);
-              return success;
+              return await handleAction(modal.type, modal.bookingId);
+            }
+            if (modal.type === 'cancel') {
+              return await handleAction(modal.actionType, modal.targetId);
+            }
+            if (modal.type === 'remove') {
+              return await handleAction('removePassenger', modal.bookingId);
             }
             return true;
           }}

@@ -128,23 +128,24 @@ def search_rides(
     min_seats: int | None = None,
     current_user: dict = Depends(get_current_user)
 ):
+    # Get the current user's profile ID
+    profile_id = get_profile_id(current_user["sub"])
+
+    # Exclude rides where the current user is the driver
     query = supabase.table("rides") \
         .select("*") \
-        .eq("status", "open")
+        .eq("status", "open") \
+        .neq("driver_id", profile_id)
 
     if origin:
         query = query.ilike("origin", f"%{origin}%")
-
     if destination:
         query = query.ilike("destination", f"%{destination}%")
-
     if min_seats:
         query = query.gte("seats_available", min_seats)
 
     response = query.execute()
-
     return response.data
-
 
 # GET RIDE DETAILS
 @router.get("/{rides_id}")

@@ -159,28 +159,46 @@ def reject_booking(
 
 # CANCEL BOOKING (Passenger)
 @router.delete("/{booking_id}")
-def cancel_booking(
-    booking_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    passenger_id = get_profile_id(current_user["sub"])
+def cancel_booking(booking_id: str, current_user: dict = Depends(get_current_user)):
+    profile_id = get_profile_id(current_user["sub"])
 
-    booking = supabase.table("bookings") \
+    # 1. Fetch the booking
+    booking_res = supabase.table("bookings") \
         .select("*") \
         .eq("id", booking_id) \
-        .eq("passenger_id", passenger_id) \
         .execute()
 
-    if not booking.data:
-        raise HTTPException(status_code=403, detail="Not your booking")
+    if not booking_res.data:
+        raise HTTPException(status_code=404, detail="Booking not found")
 
-    supabase.table("bookings") \
-        .update({"status": "cancelled"}) \
-        .eq("id", booking_id) \
+    booking = booking_res.data[0]
+    passenger_id = booking["passenger_id"]
+    ride_id = booking["ride_id"]
+
+    # 2. Fetch the associated ride to get the driver_id and current seats
+    ride_res = supabase.table("rides") \
+        .select("driver_id, seats_available") \
+        .eq("id", ride_id) \
         .execute()
 
-    return {"message": "Booking cancelled"}
+    if not ride_res.data:
+        raise HTTPException(status_code=404, detail="Associated ride not found")
 
+    ride = ride_res.data[0]
+    driver_id = ride["driver_id"]
+
+    # 3. Check authorization: User must be either the passenger OR the driver
+    if profile_id != passenger_id and profile_id != driver_id:
+        raise HTTPException(status_code=403, detail="Not authorized to cancel this booking.")
+
+    # 4. Delete the booking (or you could update status to 'cancelled')
+    supabase.table("bookings").delete().eq("id", booking_id).execute()
+
+    # 5. Restore the available seat on the ride
+    new_seats = ride["seats_available"] + 1
+    supabase.table("rides").update({"seats_available": new_seats}).eq("id", ride_id).execute()
+
+    return {"message": "Passenger removed / Booking cancelled"}
 
 # dont need that also we need something that actually completes the ride and turns
     
