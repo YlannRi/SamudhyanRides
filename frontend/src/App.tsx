@@ -148,7 +148,7 @@ const App: React.FC = () => {
   const [requestRidePrefill, setRequestRidePrefill] = useState<RidePrefill | undefined>(undefined);
 
   // Driver-gating
-  const [canUseDriverMode, setCanUseDriverMode] = useState<boolean>(true);
+  const [canUseDriverMode, setCanUseDriverMode] = useState<boolean>(false);
   const [showDriverSignup, setShowDriverSignup] = useState<boolean>(false);
   const [afterDriverSignupTab, setAfterDriverSignupTab] = useState<Tab>('home');
 
@@ -162,8 +162,9 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = async () => {
     setIsAuthenticated(true);
+    await refreshDriverStatus();
   };
 
   const handleLogout = () => {

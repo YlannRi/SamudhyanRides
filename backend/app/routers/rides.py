@@ -101,7 +101,7 @@ def create_ride(
         .limit(1) \
         .execute()
 
-    if not driver.data:
+    if not driver.data or driver.data[0].get("verified") is not True:
         raise HTTPException(status_code=403, detail="You need to register as a driver")
 
     new_ride = supabase.table("rides").insert({
