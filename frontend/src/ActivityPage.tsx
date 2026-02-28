@@ -1,13 +1,11 @@
 // Reason why navbar goes weird is because it has a scroll bar on the right
 // Removed RouteRow for now because it's surplus
 // Ylann sorting out message button stuff
-import React, { useState, useRef } from 'react';
+
+import React, {useRef, useState} from 'react';
 import './ActivityPage.css';
-import { MapPlaceholder } from './App.tsx'
-import { DetailRow } from './App.tsx'
-import { Icons } from './App.tsx'
-import { Btn } from './App.tsx'
-import { RideRenderMap } from './components/Map/RideRenderMap';
+import {Btn, DetailRow, Icons, MapPlaceholder} from './App.tsx'
+import {RideRenderMap} from './components/Map/RideRenderMap';
 
 // Trip type
 type Trip = {
@@ -206,7 +204,7 @@ type ModalState =
   | { type: 'deny'; passengerName: string; bookingId: number }
   | { type: 'remove'; passengerName: string; bookingId: number }
   | { type: 'success'; icon: string; title: string; sub: string }
-  | { type: 'start'; title: string; body: string };
+  | { type: 'start'; title: string; body: string; targetId: number };
 
 
 // What comes up when driver kicks, rates etc
@@ -471,46 +469,57 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
   // Called when action is confirmed + success shown — dismiss modal then sheet
   const doneModal = () => { setModal(null); close(); };
 
-  const handleAction = async (type: 'accept' | 'deny' | 'cancelBooking' | 'removePassenger' | 'cancelRide', targetId: number) => {
-    try {
-      const token = localStorage.getItem('authToken');
-      if (!token) throw new Error("No token found");
+// 1. Add 'startRide' to the type signature
+const handleAction = async (type: 'accept' | 'deny' | 'cancelBooking' | 'removePassenger' | 'cancelRide' | 'startRide', targetId: number) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) throw new Error("No token found");
 
-      let endpoint = '';
-      let method = 'DELETE';
+    let endpoint = '';
+    let method = 'DELETE';
+    let body: string | undefined = undefined; // <-- Add support for JSON bodies
 
-      switch (type) {
-        case 'accept':
-          endpoint = `https://localhost:8000/bookings/${targetId}/accept`;
-          method = 'PUT';
-          break;
-        case 'deny':
-        case 'cancelBooking':
-        case 'removePassenger':
-          endpoint = `https://localhost:8000/bookings/${targetId}`;
-          method = 'DELETE';
-          break;
-        case 'cancelRide':
-          endpoint = `https://localhost:8000/rides/${targetId}`;
-          method = 'DELETE';
-          break;
-      }
-
-      const response = await fetch(endpoint, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error(`${type} failed`);
-
-      return true;
-    } catch (err) {
-      console.error(err);
-      return false;
+    switch (type) {
+      case 'accept':
+        endpoint = `https://localhost:8000/bookings/${targetId}/accept`;
+        method = 'PUT';
+        break;
+      case 'deny':
+      case 'cancelBooking':
+      case 'removePassenger':
+        endpoint = `https://localhost:8000/bookings/${targetId}`;
+        method = 'DELETE';
+        break;
+      case 'cancelRide':
+        endpoint = `https://localhost:8000/rides/${targetId}`;
+        method = 'DELETE';
+        break;
+      // 2. Add the startRide case
+      case 'startRide':
+        endpoint = `https://localhost:8000/rides/${targetId}`;
+        method = 'PUT';
+        body = JSON.stringify({ status: 'in_progress' });
+        break;
     }
-  };
+
+    // 3. Include headers and body in the fetch call
+    const response = await fetch(endpoint, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(body ? { 'Content-Type': 'application/json' } : {})
+      },
+      body
+    });
+
+    if (!response.ok) throw new Error(`${type} failed`);
+
+    return true;
+  } catch (err) {
+    console.error(err);
+    return false;
+  }
+};
 
   const onTouchStart = (e: React.TouchEvent) => { touchStartY.current = e.touches[0].clientY; };
   const onTouchEnd = (e: React.TouchEvent) => {
@@ -636,7 +645,8 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
                 onClick={() => openModal({
                   type: 'start',
                   title: 'Start whole trip?',
-                  body: 'This will start your trip and notify users.'
+                  body: 'This will start your trip and notify users.',
+                  targetId: trip.ride_id!
                 })} />
             </div>
           </>
@@ -740,6 +750,9 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
             if (modal.type === 'remove') {
               return await handleAction('removePassenger', modal.bookingId);
             }
+            if (modal.type === 'start') {
+              return await handleAction('startRide', modal.targetId);
+            }
             return true;
           }}
         />
@@ -747,7 +760,6 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
     </>
   );
 };
-
 
 
 // Trip Section - What is first seen on activity page
@@ -894,7 +906,8 @@ const ActivityPage: React.FC = () => {
             ride_id: ride.id,
             destination: ride.destination,
             time: ride.departure_time,
-            status: ride.status === 'completed' ? 'pastDriver' : 'upcomingDriver',
+            status: ride.status === 'completed' ? 'pastDriver' :
+                    ride.status === 'in_progress' ? 'activeDriver' : 'upcomingDriver',
             action: 'More',
             numberPassengers: ride.seats_total - ride.seats_available,
             passengers: ride.bookings
