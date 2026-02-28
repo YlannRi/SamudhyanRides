@@ -1,13 +1,11 @@
 // Reason why navbar goes weird is because it has a scroll bar on the right
 // Removed RouteRow for now because it's surplus
-// Ylann sorting out message button stuff
 
 import React, {useRef, useState} from 'react';
 import './ActivityPage.css';
 import {Btn, DetailRow, Icons, MapPlaceholder} from './App.tsx'
 import {RideRenderMap} from './components/Map/RideRenderMap';
 
-// Trip type
 type Trip = {
   id: number;
   ride_id?: number;
@@ -28,47 +26,11 @@ type Trip = {
 };
 
 
-// BACKEND REQUIRED
-// These trip arrays are currently hardcoded mock data.
-
-//
-// Should return trips filtered by:
-// - logged-in user ID
-// - role (driver / rider)
-// - status
-//
-// Must include:
-// - destination
-// - driver/passenger names
-// - price
-// - rating
-// - timestamps
-// - passenger count
-
-// ─── Trip data what i need from database ────────────────────────────────────────────────────────────────
-// Removed old mock arrays
-
-
-
-// BACKEND REQUIRED
-// Replace mock passenger data with:
-//
-// Should return:
-// - passenger id
-// - name
-// - rating
-// - pickup location
-// - cost
-// - whether driver has rated them
-// - rating given for this trip
-//
-// Needed for PassengerCarousel in upcomingDriver & pastDriver trips.
-// Removed mock passenger functions
 
 
 
 
-// ── Rating labels ──────────────────────────────────────────────
+
 const RATING_LABELS: Record<number, string> = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Great', 5: 'Excellent' };
 
 
@@ -875,21 +837,29 @@ const ActivityPage: React.FC = () => {
         if (!response.ok) throw new Error("Failed to fetch rider activity");
         const data = await response.json();
 
-        const transformed: Trip[] = data.map((b: any) => ({
-          id: b.id,
-          ride_id: b.ride_id,
-          username: b.ride?.driver?.first_name ? `${b.ride.driver.first_name} ${b.ride.driver.last_name}` :
-            b.passenger_name || `User ${b.user_id?.substring(0, 4)}`,
-          destination: b.dropoff_location || b.ride?.destination || 'Destination',
-          time: b.pickup_time || b.ride?.departure_time || 'Pending',
-          price: `£${b.price || '0.00'}`,
-          status: b.status === 'pending' ? 'requested' :
-            b.status === 'confirmed' ? 'upcomingUser' :
-              b.status === 'completed' ? 'pastUser' : 'cancelled', // Default to cancelled if not matched
-          action: 'More',
-          pickup_lat: b.pickup_lat,
-          pickup_lng: b.pickup_lng
-        })).filter((t: Trip) => t.status !== 'cancelled');
+        const transformed: Trip[] = data.map((b: any) => {
+          // Fallback to check 'rides' or 'ride' depending on Supabase structure
+          const rideData = b.ride || {};
+
+          return {
+            id: b.id,
+            ride_id: b.ride_id,
+            username: rideData.driver?.first_name ? `${rideData.driver.first_name} ${rideData.driver.last_name}` :
+              b.passenger_name || `User ${b.user_id?.substring(0, 4)}`,
+            destination: b.dropoff_location || rideData.destination || 'Destination',
+            time: b.pickup_time || rideData.departure_time || 'Pending',
+            price: `£${b.price || '0.00'}`,
+
+            // MAP STATUS HERE: Check the nested ride status to override the booking status
+            status: b.status === 'pending' ? 'requested' :
+              b.status === 'confirmed' ? (rideData.status === 'in_progress' ? 'activeUser' : 'upcomingUser') :
+                b.status === 'completed' ? 'pastUser' : 'cancelled',
+
+            action: 'More',
+            pickup_lat: b.pickup_lat,
+            pickup_lng: b.pickup_lng
+          };
+        }).filter((t: Trip) => t.status !== 'cancelled');
         setBookings(transformed);
       } else {
         const response = await fetch('https://localhost:8000/rides/driver/dashboard', {
@@ -900,7 +870,7 @@ const ActivityPage: React.FC = () => {
 
         const finalDriverActivities: Trip[] = [];
         ridesData.forEach((ride: any) => {
-          // 1. Add the ride itself (for upcoming/past)
+          // Add the ride itself (for upcoming/past)
           finalDriverActivities.push({
             id: ride.id,
             ride_id: ride.id,
@@ -922,7 +892,7 @@ const ActivityPage: React.FC = () => {
               }))
           });
 
-          // 2. Add each pending booking (for requests)
+          // Add each pending booking (for requests)
           ride.bookings.forEach((b: any) => {
             if (b.status === 'pending') {
               finalDriverActivities.push({
