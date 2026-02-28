@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, {useEffect, useState} from 'react';
 import './JourneyPage.css';
-import { DetailRow } from './App';
-import { Icons } from './App';
-import { Btn } from './App.tsx';
-import { RideRenderMap } from './components/Map/RideRenderMap';
+import {DetailRow, Icons} from './App';
+import {Btn} from './App.tsx';
+import {RideRenderMap} from './components/Map/RideRenderMap';
+
 
 // ─── User Journey View ─────────────────────────────────────────
 const UserJourney: React.FC<{ trips: any[] }> = ({ trips }) => {
@@ -328,7 +328,6 @@ const JourneyPage: React.FC = () => {
           <button
             className={`toggle-tab ${mode === 'driver' ? 'toggle-tab-active' : ''}`}
             onClick={() => {
-              if (!canUseDriverMode) return onDriverSignup();
               setMode('driver');
             }}
           >
