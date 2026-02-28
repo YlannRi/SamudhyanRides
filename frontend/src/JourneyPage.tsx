@@ -316,6 +316,7 @@ const JourneyPage: React.FC = () => {
     <>
       <header className="uber-header">
         <h1 className="activity-title">Journey</h1>
+
         <div className="top-toggle">
           <button
             className={`toggle-tab ${mode === 'user' ? 'toggle-tab-active' : ''}`}
@@ -323,9 +324,13 @@ const JourneyPage: React.FC = () => {
           >
             Rider
           </button>
+
           <button
             className={`toggle-tab ${mode === 'driver' ? 'toggle-tab-active' : ''}`}
-            onClick={() => setMode('driver')}
+            onClick={() => {
+              if (!canUseDriverMode) return onDriverSignup();
+              setMode('driver');
+            }}
           >
             Driver
           </button>

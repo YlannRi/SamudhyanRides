@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { apiFetch } from './lib/api';
 
 const BackIcon = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -159,7 +160,7 @@ const DriverSignupPage: React.FC<DriverSignupPageProps> = ({ onBack, onComplete 
     setTaxInfo(existing?.tax_info ?? '');
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSaved(false);
@@ -236,6 +237,25 @@ const DriverSignupPage: React.FC<DriverSignupPageProps> = ({ onBack, onComplete 
       })
     );
 
+    // If the user is already logged in, try to actually upgrade them on the backend.
+    // (If they aren't logged in yet, this will fail silently and we still keep the draft.)
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      try {
+        await apiFetch('drivers/upgrade', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            licence_number: licenseNumber.trim(),
+            vehicle_registration: licensePlate.trim(),
+          }),
+        });
+      } catch (err: any) {
+        setError(err?.message ?? 'Driver signup failed. Please check your details and try again.');
+        return;
+      }
+    }
+
     setSaved(true);
     onComplete();
   };
@@ -268,9 +288,7 @@ const DriverSignupPage: React.FC<DriverSignupPageProps> = ({ onBack, onComplete 
       </p>
 
       <div className="auth-card">
-        {error && (
-          <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '12px' }}>{error}</p>
-        )}
+        {error && <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '12px' }}>{error}</p>}
         {saved && (
           <p style={{ color: '#34d399', fontSize: '14px', marginBottom: '12px' }}>
             Saved. Your driver application is now pending verification.

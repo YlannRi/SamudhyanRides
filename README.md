@@ -39,7 +39,9 @@ Which allows to view all endpoints, send test requests and inspect responses
 
 ## Testing & Running the Frontend
 
-### 1️⃣ open a different terminal window within your code editor 
+### 1️⃣ open a different terminal window within your code editor, so its '.../SamudhyanRides/frontend'. Don't close other terminal.
+
+'cd ...\SamudhyanRides\frontend'
 
 ### 2️⃣ execute the following command:
 
