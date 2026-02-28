@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
-from app.accounts.database import supabase
-from app.accounts.dependencies import get_current_user
 import random
 import string
+
+from app.accounts.database import supabase
+from app.accounts.dependencies import get_current_user
+from fastapi import APIRouter, Depends, HTTPException
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -200,18 +201,46 @@ def cancel_booking(booking_id: str, current_user: dict = Depends(get_current_use
 
     return {"message": "Passenger removed / Booking cancelled"}
 
-# dont need that also we need something that actually completes the ride and turns
-    
+
 
 # GET MY BOOKINGS
 @router.get("/me")
 def get_my_bookings(current_user: dict = Depends(get_current_user)):
     profile_id = get_profile_id(current_user["sub"])
 
+    # Fetch the user's bookings
     bookings = supabase.table("bookings") \
         .select("*") \
         .eq("passenger_id", profile_id) \
         .execute()
+
+    if not bookings.data:
+        return []
+
+    # Fetch the associated rides
+    ride_ids = list(set(b["ride_id"] for b in bookings.data))
+    rides_res = supabase.table("rides") \
+        .select("*") \
+        .in_("id", ride_ids) \
+        .execute()
+
+    # Fetch the driver profiles for those rides
+    driver_ids = list(set(r["driver_id"] for r in rides_res.data))
+    drivers_res = supabase.table("user_profiles") \
+        .select("id, first_name, last_name") \
+        .in_("id", driver_ids) \
+        .execute()
+
+    drivers_by_id = {d["id"]: d for d in drivers_res.data}
+
+    # Assemble the nested data
+    rides_by_id = {}
+    for r in rides_res.data:
+        r["driver"] = drivers_by_id.get(r["driver_id"])
+        rides_by_id[r["id"]] = r
+
+    for b in bookings.data:
+        b["ride"] = rides_by_id.get(b["ride_id"])
 
     return bookings.data
 

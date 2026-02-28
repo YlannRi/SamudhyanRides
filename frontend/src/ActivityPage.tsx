@@ -1,15 +1,11 @@
 // Reason why navbar goes weird is because it has a scroll bar on the right
 // Removed RouteRow for now because it's surplus
-// Ylann sorting out message button stuff
-import React, { useState, useRef } from 'react';
-import './ActivityPage.css';
-import { MapPlaceholder } from './App.tsx'
-import { DetailRow } from './App.tsx'
-import { Icons } from './App.tsx'
-import { Btn } from './App.tsx'
-import { RideRenderMap } from './components/Map/RideRenderMap';
 
-// Trip type
+import React, {useRef, useState} from 'react';
+import './ActivityPage.css';
+import {Btn, DetailRow, Icons, MapPlaceholder} from './App.tsx'
+import {RideRenderMap} from './components/Map/RideRenderMap';
+
 type Trip = {
   id: number;
   ride_id?: number;
@@ -30,47 +26,11 @@ type Trip = {
 };
 
 
-// BACKEND REQUIRED
-// These trip arrays are currently hardcoded mock data.
-
-//
-// Should return trips filtered by:
-// - logged-in user ID
-// - role (driver / rider)
-// - status
-//
-// Must include:
-// - destination
-// - driver/passenger names
-// - price
-// - rating
-// - timestamps
-// - passenger count
-
-// ─── Trip data what i need from database ────────────────────────────────────────────────────────────────
-// Removed old mock arrays
-
-
-
-// BACKEND REQUIRED
-// Replace mock passenger data with:
-//
-// Should return:
-// - passenger id
-// - name
-// - rating
-// - pickup location
-// - cost
-// - whether driver has rated them
-// - rating given for this trip
-//
-// Needed for PassengerCarousel in upcomingDriver & pastDriver trips.
-// Removed mock passenger functions
 
 
 
 
-// ── Rating labels ──────────────────────────────────────────────
+
 const RATING_LABELS: Record<number, string> = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Great', 5: 'Excellent' };
 
 
@@ -206,7 +166,7 @@ type ModalState =
   | { type: 'deny'; passengerName: string; bookingId: number }
   | { type: 'remove'; passengerName: string; bookingId: number }
   | { type: 'success'; icon: string; title: string; sub: string }
-  | { type: 'start'; title: string; body: string };
+  | { type: 'start'; title: string; body: string; targetId: number };
 
 
 // What comes up when driver kicks, rates etc
@@ -471,46 +431,57 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
   // Called when action is confirmed + success shown — dismiss modal then sheet
   const doneModal = () => { setModal(null); close(); };
 
-  const handleAction = async (type: 'accept' | 'deny' | 'cancelBooking' | 'removePassenger' | 'cancelRide', targetId: number) => {
-    try {
-      const token = localStorage.getItem('authToken');
-      if (!token) throw new Error("No token found");
+// 1. Add 'startRide' to the type signature
+const handleAction = async (type: 'accept' | 'deny' | 'cancelBooking' | 'removePassenger' | 'cancelRide' | 'startRide', targetId: number) => {
+  try {
+    const token = localStorage.getItem('authToken');
+    if (!token) throw new Error("No token found");
 
-      let endpoint = '';
-      let method = 'DELETE';
+    let endpoint = '';
+    let method = 'DELETE';
+    let body: string | undefined = undefined; // <-- Add support for JSON bodies
 
-      switch (type) {
-        case 'accept':
-          endpoint = `https://localhost:8000/bookings/${targetId}/accept`;
-          method = 'PUT';
-          break;
-        case 'deny':
-        case 'cancelBooking':
-        case 'removePassenger':
-          endpoint = `https://localhost:8000/bookings/${targetId}`;
-          method = 'DELETE';
-          break;
-        case 'cancelRide':
-          endpoint = `https://localhost:8000/rides/${targetId}`;
-          method = 'DELETE';
-          break;
-      }
-
-      const response = await fetch(endpoint, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error(`${type} failed`);
-
-      return true;
-    } catch (err) {
-      console.error(err);
-      return false;
+    switch (type) {
+      case 'accept':
+        endpoint = `https://localhost:8000/bookings/${targetId}/accept`;
+        method = 'PUT';
+        break;
+      case 'deny':
+      case 'cancelBooking':
+      case 'removePassenger':
+        endpoint = `https://localhost:8000/bookings/${targetId}`;
+        method = 'DELETE';
+        break;
+      case 'cancelRide':
+        endpoint = `https://localhost:8000/rides/${targetId}`;
+        method = 'DELETE';
+        break;
+      // 2. Add the startRide case
+      case 'startRide':
+        endpoint = `https://localhost:8000/rides/${targetId}`;
+        method = 'PUT';
+        body = JSON.stringify({ status: 'in_progress' });
+        break;
     }
-  };
+
+    // 3. Include headers and body in the fetch call
+    const response = await fetch(endpoint, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        ...(body ? { 'Content-Type': 'application/json' } : {})
+      },
+      body
+    });
+
+    if (!response.ok) throw new Error(`${type} failed`);
+
+    return true;
+  } catch (err) {
+    console.error(err);
+    return false;
+  }
+};
 
   const onTouchStart = (e: React.TouchEvent) => { touchStartY.current = e.touches[0].clientY; };
   const onTouchEnd = (e: React.TouchEvent) => {
@@ -636,7 +607,8 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
                 onClick={() => openModal({
                   type: 'start',
                   title: 'Start whole trip?',
-                  body: 'This will start your trip and notify users.'
+                  body: 'This will start your trip and notify users.',
+                  targetId: trip.ride_id!
                 })} />
             </div>
           </>
@@ -740,6 +712,9 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
             if (modal.type === 'remove') {
               return await handleAction('removePassenger', modal.bookingId);
             }
+            if (modal.type === 'start') {
+              return await handleAction('startRide', modal.targetId);
+            }
             return true;
           }}
         />
@@ -747,7 +722,6 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
     </>
   );
 };
-
 
 
 // Trip Section - What is first seen on activity page
@@ -870,21 +844,29 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
         if (!response.ok) throw new Error("Failed to fetch rider activity");
         const data = await response.json();
 
-        const transformed: Trip[] = data.map((b: any) => ({
-          id: b.id,
-          ride_id: b.ride_id,
-          username: b.ride?.driver?.first_name ? `${b.ride.driver.first_name} ${b.ride.driver.last_name}` :
-            b.passenger_name || `User ${b.user_id?.substring(0, 4)}`,
-          destination: b.dropoff_location || b.ride?.destination || 'Destination',
-          time: b.pickup_time || b.ride?.departure_time || 'Pending',
-          price: `£${b.price || '0.00'}`,
-          status: b.status === 'pending' ? 'requested' :
-            b.status === 'confirmed' ? 'upcomingUser' :
-              b.status === 'completed' ? 'pastUser' : 'cancelled', // Default to cancelled if not matched
-          action: 'More',
-          pickup_lat: b.pickup_lat,
-          pickup_lng: b.pickup_lng
-        })).filter((t: Trip) => t.status !== 'cancelled');
+        const transformed: Trip[] = data.map((b: any) => {
+          // Fallback to check 'rides' or 'ride' depending on Supabase structure
+          const rideData = b.ride || {};
+
+          return {
+            id: b.id,
+            ride_id: b.ride_id,
+            username: rideData.driver?.first_name ? `${rideData.driver.first_name} ${rideData.driver.last_name}` :
+              b.passenger_name || `User ${b.user_id?.substring(0, 4)}`,
+            destination: b.dropoff_location || rideData.destination || 'Destination',
+            time: b.pickup_time || rideData.departure_time || 'Pending',
+            price: `£${b.price || '0.00'}`,
+
+            // MAP STATUS HERE: Check the nested ride status to override the booking status
+            status: b.status === 'pending' ? 'requested' :
+              b.status === 'confirmed' ? (rideData.status === 'in_progress' ? 'activeUser' : 'upcomingUser') :
+                b.status === 'completed' ? 'pastUser' : 'cancelled',
+
+            action: 'More',
+            pickup_lat: b.pickup_lat,
+            pickup_lng: b.pickup_lng
+          };
+        }).filter((t: Trip) => t.status !== 'cancelled');
         setBookings(transformed);
       } else {
         const response = await fetch('https://localhost:8000/rides/driver/dashboard', {
@@ -895,13 +877,14 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
 
         const finalDriverActivities: Trip[] = [];
         ridesData.forEach((ride: any) => {
-          // 1. Add the ride itself (for upcoming/past)
+          // Add the ride itself (for upcoming/past)
           finalDriverActivities.push({
             id: ride.id,
             ride_id: ride.id,
             destination: ride.destination,
             time: ride.departure_time,
-            status: ride.status === 'completed' ? 'pastDriver' : 'upcomingDriver',
+            status: ride.status === 'completed' ? 'pastDriver' :
+                    ride.status === 'in_progress' ? 'activeDriver' : 'upcomingDriver',
             action: 'More',
             numberPassengers: ride.seats_total - ride.seats_available,
             passengers: ride.bookings
@@ -916,7 +899,7 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
               }))
           });
 
-          // 2. Add each pending booking (for requests)
+          // Add each pending booking (for requests)
           ride.bookings.forEach((b: any) => {
             if (b.status === 'pending') {
               finalDriverActivities.push({
