@@ -37,7 +37,7 @@ const PostRidePage: React.FC = () => {
       ]);
 
       if (originResults.length === 0) {
-        throw new Error('Could not find coordinates for the pick-up location.');
+        throw new Error('Could not find coordinates for the Start location.');
       }
       if (destResults.length === 0) {
         throw new Error('Could not find coordinates for the destination.');
@@ -108,7 +108,7 @@ const PostRidePage: React.FC = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="auth-field">
-            <label className="auth-label">Pick-up Location</label>
+            <label className="auth-label">Start Location</label>
             <input
               type="text"
               className="auth-input"

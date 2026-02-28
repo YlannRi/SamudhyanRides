@@ -1,73 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './JourneyPage.css';
 import { DetailRow } from './App';
 import { Icons } from './App';
 import { Btn } from './App.tsx';
 import { RideRenderMap } from './components/Map/RideRenderMap';
 
+// ─── User Journey View ─────────────────────────────────────────
+const UserJourney: React.FC<{ trips: any[] }> = ({ trips }) => {
+  const [activeTripIdx, setActiveTripIdx] = useState(0);
 
-// Mock Data 
-// BACKEND REQUIRED: Replace with real active trip data for current user
+  if (trips.length === 0) {
+    return (
+      <div className="journey-content" style={{ alignItems: 'center', marginTop: '60px', color: 'var(--text-secondary)' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
+        <h3>No Active Journeys</h3>
+        <p>You don't have any rides currently in progress.</p>
+      </div>
+    );
+  }
 
-const MOCK_ACTIVE_USER_TRIP = {
-  rideId: 1,
-  driverName: 'James Miller',
-  arriving: '~09:45',
-  pickupCode: 'K7M2',
-  destination: 'University of Bath',
-  numberplate: 'BA21 XYZ',
-  carModel: 'Toyota Prius · White',
-  timeOfArrival: '09:45',
-  cost: '£7.60',
-};
+  const trip = trips[activeTripIdx];
+  const ride = trip.ride || {};
+  const driver = ride.driver || {};
+  const driverName = driver.first_name ? `${driver.first_name} ${driver.last_name}` : 'Unknown Driver';
 
-// Ordered by algorithm (closest pickup first)
-// get real data
-const MOCK_DRIVER_PICKUPS = [
-  { id: 1, name: 'Emma Thompson', rating: 4.8, pickupAddress: 'Claverton Down Rd', cost: '£8.40', confirmed: false, code: "YIGM" },
-  { id: 2, name: 'Daniel Carter', rating: 4.6, pickupAddress: 'North Road', cost: '£6.90', confirmed: true, code: "YIGE" },
-  { id: 3, name: 'Sophie Patel', rating: 4.9, pickupAddress: 'Widcombe Hill', cost: '£12.75', confirmed: false, code: "YIGH" },
-];
-
-
-
-
-
-// User Journey View
-const UserJourney: React.FC = () => {
-  const trip = MOCK_ACTIVE_USER_TRIP;
+  // Format departure time
+  const departureDate = new Date(ride.departure_time || trip.pickup_time);
+  const timeOfArrival = isNaN(departureDate.getTime()) ? 'Pending' : departureDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
     <div className="journey-content">
+      {/* Multiple Active Rides Toggle */}
+      {trips.length > 1 && (
+        <div className="passenger-tabs">
+          {trips.map((t, i) => (
+            <button
+              key={t.id}
+              className={`passenger-tab ${i === activeTripIdx ? 'passenger-tab-active' : ''}`}
+              onClick={() => setActiveTripIdx(i)}
+            >
+              Ride #{t.ride_id}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Driver header card */}
       <div className="journey-driver-header">
-        <div className="journey-driver-avatar">{trip.driverName[0]}</div>
+        <div className="journey-driver-avatar">{driverName[0]}</div>
         <div className="journey-driver-info">
-          <div className="journey-driver-name">{trip.driverName}</div>
+          <div className="journey-driver-name">{driverName}</div>
           <div className="journey-driver-sub">Your Driver</div>
         </div>
         <div className="journey-arriving-badge">
           {Icons.clock}
-          <span>Arriving {trip.arriving}</span>
+          <span>Departure {timeOfArrival}</span>
         </div>
       </div>
 
       {/* Map */}
-      <RideRenderMap rideId={trip.rideId} height="300px" interactive={true} />
+      <RideRenderMap rideId={trip.ride_id} height="300px" interactive={true} />
 
       {/* Pickup code */}
       <div className="journey-code-card">
         <span className="journey-code-label">Pick Up Code</span>
-        <span className="journey-code-value">{trip.pickupCode}</span>
+        <span className="journey-code-value">{trip.pickup_code || '----'}</span>
       </div>
 
       {/* Trip details */}
       <div className="sheet-details-card">
-        <DetailRow label="Destination" value={trip.destination} />
-        <DetailRow label="Numberplate" value={trip.numberplate} />
-        <DetailRow label="Car Model" value={trip.carModel} />
-        <DetailRow label="Time of Arrival" value={trip.timeOfArrival} />
-        <DetailRow label="Cost" value={trip.cost} valueClass="detail-price" />
+        <DetailRow label="Destination" value={trip.dropoff_location || ride.destination || '—'} />
+        <DetailRow label="Vehicle" value="Standard Vehicle" />
+        <DetailRow label="Departure Time" value={timeOfArrival} />
+        <DetailRow label="Cost" value={`£${trip.price || '0.00'}`} valueClass="detail-price" />
       </div>
 
       {/* Action */}
@@ -75,110 +80,237 @@ const UserJourney: React.FC = () => {
         <button className="sheet-action-btn btn-message">
           {Icons.message} Message Driver
         </button>
-      </div>
-      <div className="journey-actions">
-        {/* BACKEND: onClick={send off direct predetermined report} */}
         <Btn cls="btn-report" icon={Icons.report} label="Report Issue" />
       </div>
     </div>
   );
 };
 
-// Driver Journey View 
-const DriverJourney: React.FC = () => {
-  const [currentIdx, setCurrentIdx] = useState(0);
+// ─── Driver Journey View ───────────────────────────────────────
+const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => void }> = ({ rides, onComplete }) => {
+  const [activeRideIdx, setActiveRideIdx] = useState(0);
+  const [currentPassIdx, setCurrentPassIdx] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [confirmed, setConfirmed] = useState<Set<number>>(
-    new Set(MOCK_DRIVER_PICKUPS.filter(p => p.confirmed).map(p => p.id))
-  );
+  const [confirmedPickups, setConfirmedPickups] = useState<Set<number>>(new Set());
+  const [isCompleting, setIsCompleting] = useState(false);
 
-  const passengers = MOCK_DRIVER_PICKUPS;
-  const current = passengers[currentIdx];
-  const isConfirmed = confirmed.has(current.id);
+  if (rides.length === 0) {
+    return (
+      <div className="journey-content" style={{ alignItems: 'center', marginTop: '60px', color: 'var(--text-secondary)' }}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚗</div>
+        <h3>No Active Drives</h3>
+        <p>You are not currently driving any active routes.</p>
+      </div>
+    );
+  }
 
+  const activeRide = rides[activeRideIdx];
+  const confirmedBookings = (activeRide.bookings || []).filter((b: any) => b.status === 'confirmed');
+  const currentPassenger = confirmedBookings[currentPassIdx];
+  const isConfirmed = currentPassenger && confirmedPickups.has(currentPassenger.id);
 
   const handleConfirm = () => {
-    setConfirmed(prev => new Set([...prev, current.id]));
-    setRefreshTrigger(prev => prev + 1);
+    if (currentPassenger) {
+      setConfirmedPickups(prev => new Set([...prev, currentPassenger.id]));
+      setRefreshTrigger(prev => prev + 1);
+    }
   };
 
+  const handleCompleteRideClick = async () => {
+    setIsCompleting(true);
+    await onComplete(activeRide.id);
+    setIsCompleting(false);
+  };
 
   return (
     <div className="journey-content">
+      {/* Multiple Active Rides Toggle */}
+      {rides.length > 1 && (
+        <div className="passenger-tabs" style={{ marginBottom: '16px' }}>
+          {rides.map((r, i) => (
+            <button
+              key={r.id}
+              className={`passenger-tab ${i === activeRideIdx ? 'passenger-tab-active' : ''}`}
+              onClick={() => {
+                setActiveRideIdx(i);
+                setCurrentPassIdx(0); // Reset passenger index on ride change
+              }}
+            >
+              Route: {r.destination}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Header */}
       <div className="journey-driver-mode-header">
         <div className="journey-mode-sub">Pick Up Order</div>
-
       </div>
 
       {/* Passenger tabs */}
-      <div className="passenger-tabs">
-        {passengers.map((p, i) => (
-          <button
-            key={p.id}
-            className={`passenger-tab${i === currentIdx ? ' passenger-tab-active' : ''}${confirmed.has(p.id) ? ' passenger-tab-done' : ''}`}
-            onClick={() => setCurrentIdx(i)}
-          >
-            {p.name.split(' ')[0]}
-            {confirmed.has(p.id) && <span className="tab-done-dot">✓</span>}
-          </button>
-        ))}
-      </div>
+      {confirmedBookings.length > 0 ? (
+        <div className="passenger-tabs">
+          {confirmedBookings.map((b: any, i: number) => {
+            const passName = b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : `Pass ${b.id}`;
+            const isDone = confirmedPickups.has(b.id);
+            return (
+              <button
+                key={b.id}
+                className={`passenger-tab${i === currentPassIdx ? ' passenger-tab-active' : ''}${isDone ? ' passenger-tab-done' : ''}`}
+                onClick={() => setCurrentPassIdx(i)}
+              >
+                {passName.split(' ')[0]}
+                {isDone && <span className="tab-done-dot">✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '16px' }}>
+          No confirmed passengers for this ride.
+        </p>
+      )}
 
       {/* Map */}
       <div style={{ marginBottom: '16px' }}>
-        <RideRenderMap rideId={1} height="300px" interactive={true} refreshTrigger={refreshTrigger} />
+        <RideRenderMap rideId={activeRide.id} height="300px" interactive={true} refreshTrigger={refreshTrigger} />
       </div>
 
       {/* Passenger card */}
-      <div className="journey-passenger-card">
-        <div className="journey-passenger-header">
-          <div className="journey-passenger-avatar">{current.name[0]}</div>
-          <div className="journey-passenger-info">
-            <div className="journey-passenger-name">{current.name}</div>
-            {current.rating !== undefined
-              ? <div className="journey-passenger-rating">⭐ {current.rating}</div>
-              : <div className="journey-passenger-rating no-rating">No rating yet</div>
-            }
+      {currentPassenger && (
+        <div className="journey-passenger-card">
+          <div className="journey-passenger-header">
+            <div className="journey-passenger-avatar">
+              {currentPassenger.passenger?.first_name ? currentPassenger.passenger.first_name[0] : 'U'}
+            </div>
+            <div className="journey-passenger-info">
+              <div className="journey-passenger-name">
+                {currentPassenger.passenger ? `${currentPassenger.passenger.first_name} ${currentPassenger.passenger.last_name}` : 'Unknown'}
+              </div>
+              {currentPassenger.passenger?.rider_rating !== undefined ? (
+                <div className="journey-passenger-rating">⭐ {currentPassenger.passenger.rider_rating}</div>
+              ) : (
+                <div className="journey-passenger-rating no-rating">No rating yet</div>
+              )}
+            </div>
+            {isConfirmed && (
+              <div className="journey-confirmed-badge">Picked Up ✓</div>
+            )}
           </div>
-          {isConfirmed && (
-            <div className="journey-confirmed-badge">Picked Up ✓</div>
-          )}
-        </div>
 
-        <div className="sheet-details-card journey-passenger-details">
-          <DetailRow label="Pick Up Address" value={<><span className="detail-pin">{Icons.pin}</span>{current.pickupAddress}</>} />
-          <DetailRow label="Cost" value={current.cost} valueClass="detail-price" />
-          <DetailRow label="Code" value={current.code} valueClass="detail-value" />
+          <div className="sheet-details-card journey-passenger-details">
+            <DetailRow label="Pick Up" value={<><span className="detail-pin">{Icons.pin}</span>{currentPassenger.pickup_location || 'Map Point'}</>} />
+            <DetailRow label="Cost" value={`£${currentPassenger.price || '0.00'}`} valueClass="detail-price" />
+            <DetailRow label="Code" value={currentPassenger.pickup_code || '----'} valueClass="detail-value" />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Actions */}
-      <div className="journey-actions">
-        <button className="sheet-action-btn btn-message">
-          {Icons.message} Message
-        </button>
-        {/* Update Live info */}
-        {!isConfirmed ? (
-          <button className="sheet-action-btn btn-accept journey-confirm-btn" onClick={handleConfirm}>
-            {Icons.check} Confirm Pick Up
+      {currentPassenger && (
+        <div className="journey-actions">
+          <button className="sheet-action-btn btn-message">
+            {Icons.message} Message
           </button>
-        ) : (
-          <button className="sheet-action-btn btn-accept journey-confirm-btn journey-confirm-done" disabled>
-            {Icons.check} Picked Up
-          </button>
-        )}
-      </div>
+          {!isConfirmed ? (
+            <button className="sheet-action-btn btn-accept journey-confirm-btn" onClick={handleConfirm}>
+              {Icons.check} Confirm Pick Up
+            </button>
+          ) : (
+            <button className="sheet-action-btn btn-accept journey-confirm-btn journey-confirm-done" disabled>
+              {Icons.check} Picked Up
+            </button>
+          )}
+        </div>
+      )}
 
+      {/* Complete Ride Action */}
+      <div className="journey-actions" style={{ marginTop: '12px' }}>
+        <button
+          className="sheet-action-btn"
+          style={{ background: '#22c55e', color: '#fff', border: 'none' }}
+          onClick={handleCompleteRideClick}
+          disabled={isCompleting}
+        >
+          {isCompleting ? 'Completing...' : '🏁 Complete Ride'}
+        </button>
+      </div>
 
     </div>
   );
 };
 
-// Main JourneyPage 
+// ─── Main JourneyPage ──────────────────────────────────────────
 const JourneyPage: React.FC = () => {
   const [mode, setMode] = useState<'user' | 'driver'>('user');
 
+  const [activeUserTrips, setActiveUserTrips] = useState<any[]>([]);
+  const [activeDriverRides, setActiveDriverRides] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchActiveJourneys = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) throw new Error("No token found");
+
+      // Fetch User Bookings
+      const userRes = await fetch('https://localhost:8000/bookings/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        const activeBookings = userData.filter((b: any) => b.status === 'confirmed' && b.ride?.status === 'in_progress');
+        setActiveUserTrips(activeBookings);
+      }
+
+      // Fetch Driver Dashboard
+      const driverRes = await fetch('https://localhost:8000/rides/driver/dashboard', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (driverRes.ok) {
+        const driverData = await driverRes.json();
+        const activeRides = driverData.filter((r: any) => r.status === 'in_progress');
+        setActiveDriverRides(activeRides);
+      }
+
+    } catch (err) {
+      console.error("Error fetching journeys:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActiveJourneys();
+  }, [mode]);
+
+  // Handler for completing the ride
+  const handleCompleteRide = async (rideId: number) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) return;
+
+      const response = await fetch(`https://localhost:8000/bookings/rides/${rideId}/complete`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to complete ride');
+      }
+
+      // Remove the completed ride from state directly so the UI updates instantly
+      setActiveDriverRides(prev => prev.filter(r => r.id !== rideId));
+
+    } catch (error) {
+      console.error('Error completing ride:', error);
+      alert('Could not complete the ride. Please try again.');
+    }
+  };
 
   return (
     <>
@@ -200,7 +332,15 @@ const JourneyPage: React.FC = () => {
         </div>
       </header>
 
-      {mode === 'user' ? <UserJourney /> : <DriverJourney />}
+      {loading ? (
+        <p style={{ textAlign: 'center', marginTop: '40px', color: 'var(--text-secondary)' }}>Loading your journeys...</p>
+      ) : (
+        mode === 'user' ? (
+          <UserJourney trips={activeUserTrips} />
+        ) : (
+          <DriverJourney rides={activeDriverRides} onComplete={handleCompleteRide} />
+        )
+      )}
     </>
   );
 };
