@@ -37,20 +37,30 @@ export async function apiFetch<T = any>(path: string, opts: ApiFetchOptions = {}
   const res = await fetch(url, { ...opts, headers });
 
   // Try to parse error body for nicer messages
+    // Try to parse error body for nicer messages (and preserve structured error detail)
   if (!res.ok) {
     let message = `Request failed: ${res.status} ${res.statusText}`;
+    let detail: any = null;
     try {
       const err = await res.json();
+      detail = err?.detail ?? err;
       if (err?.detail) {
         if (typeof err.detail === "string") message = err.detail;
         else if (Array.isArray(err.detail) && err.detail[0]?.msg) {
           message = `Validation Error: ${err.detail[0].loc?.join?.(".") ?? "body"} - ${err.detail[0].msg}`;
+        } else if (typeof err.detail === "object" && err.detail?.field_errors) {
+          // Keep the generic message; field-level errors are available in e.detail
+          message = "Please fix the highlighted fields.";
         }
       }
     } catch {
       // ignore JSON parse failures
     }
-    throw new Error(message);
+
+    const e: any = new Error(message);
+    e.status = res.status;
+    e.detail = detail;
+    throw e;
   }
 
   // Some endpoints might return empty body (204)

@@ -152,13 +152,16 @@ const App: React.FC = () => {
   const [showDriverSignup, setShowDriverSignup] = useState<boolean>(false);
   const [afterDriverSignupTab, setAfterDriverSignupTab] = useState<Tab>('home');
 
-  const refreshDriverStatus = async () => {
+  const refreshDriverStatus = async (): Promise<boolean> => {
     try {
       const res = await apiFetch<{ is_driver: boolean }>('drivers/me/status', { method: 'GET' });
-      setCanUseDriverMode(Boolean(res?.is_driver));
-    } catch {
-      // If the endpoint errors (e.g., profile not created yet), fail closed: treat as non-driver.
+      const ok = Boolean(res?.is_driver);
+      setCanUseDriverMode(ok);
+      return ok;
+    } catch (e) {
+      // Fail closed, but also return false so callers can decide what to do
       setCanUseDriverMode(false);
+      return false;
     }
   };
 
@@ -179,8 +182,9 @@ const App: React.FC = () => {
     setShowDriverSignup(true);
   };
 
-  const goToDriverTab = (destination: Tab) => {
-    if (!canUseDriverMode) return startDriverSignup(destination);
+  const goToDriverTab = async (destination: Tab) => {
+    const ok = await refreshDriverStatus(); // always re-check server truth
+    if (!ok) return startDriverSignup(destination);
     setActiveTab(destination);
   };
 
@@ -206,7 +210,7 @@ const App: React.FC = () => {
               setRequestRidePrefill(prefill);
               setActiveTab('request');
             }}
-            onPostRide={() => goToDriverTab('post')}
+            onPostRide={() => void goToDriverTab('post')}
             canUseDriverMode={canUseDriverMode}
             onDriverSignup={() => startDriverSignup('post')}
             onOpenTimetable={() => setActiveTab('timetable')}

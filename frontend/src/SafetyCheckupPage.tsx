@@ -373,7 +373,7 @@ const SafetyCheckupPage: React.FC<SafetyCheckupPageProps> = ({ onBack }) => {
               <div style={{ fontWeight: 800, marginBottom: 6 }}>Your trip PIN</div>
               <div className="pin-box">{pinCode}</div>
               <div style={{ marginTop: 10, color: 'rgba(255,255,255,0.6)', fontSize: 12, lineHeight: 1.4 }}>
-                (UI only) This PIN is generated locally for now. You don’t need to implement the full verification flow yet.
+                (UI only)
               </div>
             </div>
           )}

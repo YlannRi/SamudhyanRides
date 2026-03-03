@@ -80,12 +80,18 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                     throw new Error('Invalid login credentials.');
                 }
             }
-          
             else {
+                // Capture values before we clear state
+                const draft = {
+                    firstName: firstName.trim(),
+                    middleNames: middleNames.trim(),
+                    lastName: lastName.trim(),
+                    emailOrUsername: emailOrUsername.trim(),
+                };
+                const email = emailOrUsername.trim();
+                const pw = password; // keep the password for auto-login
 
-                localStorage.removeItem('authToken');
-
-
+                // Clear form UI state
                 setEmailOrUsername('');
                 setPassword('');
                 setConfirmPassword('');
@@ -94,18 +100,31 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                 setLastName('');
                 setSignupAsDriver(false);
 
-
                 if (signupAsDriver) {
-                    setSuccessMessage('Account created! Driver signup started.');
-                    onStartDriverSignup?.({
-                        firstName: firstName.trim(),
-                        middleNames: middleNames.trim(),
-                        lastName: lastName.trim(),
-                        emailOrUsername: emailOrUsername.trim(),
-                    });
-                    return;
-                }
+                    // IMPORTANT: register doesn't return a token, but /drivers/upgrade requires auth.
+                    // So we immediately log in and store authToken before launching DriverSignupPage.
+                    try {
+                        const loginRes = await apiFetch<any>('auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email, password: pw }),
+                            auth: false,
+                        });
 
+                        const token = loginRes?.access_token || loginRes?.token;
+                        if (!token) throw new Error('Auto-login failed: missing token');
+
+                        localStorage.setItem('authToken', token);
+
+                        setSuccessMessage('Account created! Complete driver signup.');
+                        onStartDriverSignup?.(draft);
+                        return;
+                    } catch (err: any) {
+                        setError(err?.message ?? 'Account created, but auto-login failed. Please log in, then complete driver signup.');
+                        setMode('login');
+                        return;
+                    }
+                }
 
                 setSuccessMessage(data.message || 'Account created! Please check your email to verify and log in.');
                 setMode('login');

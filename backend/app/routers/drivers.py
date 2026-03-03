@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException
 from app.accounts.database import supabase
 from app.accounts.dependencies import get_current_user
@@ -6,6 +6,7 @@ import re
 from pydantic import BaseModel
 from postgrest.exceptions import APIError
 from app.routers.bookings import get_profile_id
+
 
 router = APIRouter(prefix="/drivers", tags=["Drivers"])
 "based on https://www.whatdotheyknow.com/request/what_check_digit_algorithm_is_us/response/681793/attach/html/2/FOIR4709%20Mr%20R%20Nealon.pdf.html"
@@ -19,54 +20,76 @@ VEHICLE_DATABASE = {
     "TE57VRN": {"make": "Rover", "model": "75", "colour": "Blue", "seats": 5},
     "XY99ZZZ": {"make": "Mercedes", "model": "C-Class", "colour": "Grey", "seats": 5},
 }
+def _infer_full_year(two_digit_year: int, *, min_age: int = 17, max_age: int = 100) -> int:
+    """Infer a 4-digit year from a 2-digit year."""
+    current_year = date.today().year
+    candidates = [1900 + two_digit_year, 2000 + two_digit_year]
+    for y in candidates:
+        age = current_year - y
+        if min_age <= age <= max_age:
+            return y
+    return 1900 + two_digit_year
 
-def validate_licence(licence_number):
-    clean = re.sub(r'\s+', '', licence_number.strip().upper())
+def validate_licence(licence_number: str):
+    clean = re.sub(r"\s+", "", licence_number.strip().upper())
 
+    # Keep: length check
     if len(clean) != 16:
         raise ValueError("Must be 16 characters (spaces removed)")
 
+    # Keep: basic structure checks
     surname_section = clean[:5]
-    if not re.match(r'^[A-Z0-9]{5}$', surname_section):
+    if not re.match(r"^[A-Z0-9]{5}$", surname_section):
         raise ValueError("Surname section invalid (first 5 chars)")
 
-    # SECTION 2: DOB (5-10)
     dob_section = clean[5:11]
-    if not re.match(r'^[0-9]{6}$', dob_section):
+    if not re.match(r"^[0-9]{6}$", dob_section):
         raise ValueError("Date section must be 6 digits (chars 6-11)")
-    
-    names_section = clean[11:]
-    if not re.match(r'^[A-Z0-9]{5}$', names_section):
-        raise ValueError("Names/check digits invalid (last 5 chars)")
 
+    # Option B change:
+    # Previously you enforced DVLA-ish restrictions on the last 5 chars.
+    # For a uni project, accept any 5 alphanumeric characters here.
+    names_section = clean[11:]
+    if not re.match(r"^[A-Z0-9]{5}$", names_section):
+        raise ValueError("Last 5 chars must be alphanumeric (chars 12-16)")
+
+    # Keep: DOB parsing logic from the encoded date section
     decade = dob_section[0]
     year_last = dob_section[-1]
     month = dob_section[1:3]
     day = dob_section[3:5]
 
-    is_female = month.startswith(('5', '6'))
+    is_female = month.startswith(("5", "6"))
     if is_female:
         month = str(int(month) - 50)
 
     try:
-        year = int(decade + year_last)
-        birth_date = f"19{year}0{month.zfill(2)}{day.zfill(2)}"
-        dob = datetime.strptime(birth_date[:8], "%Y%m%d")
-        age = datetime.now().year - dob.year
+        yy = int(decade + year_last)
+        mm = int(month)
+        dd = int(day)
 
+        full_year = _infer_full_year(yy)
+        try:
+            dob = date(full_year, mm, dd)
+        except ValueError:
+            raise ValueError("Invalid date of birth in licence number (chars 6-11)")
+
+        age = date.today().year - dob.year - (
+            (date.today().month, date.today().day) < (dob.month, dob.day)
+        )
         if age < 17:
             raise ValueError("Must be 17+ years old")
-
     except ValueError:
-        raise ValueError("Invalid date of birth")
+        raise
+    except Exception:
+        raise ValueError("Invalid date of birth in licence number (chars 6-11)")
 
-    # SECTION 3: Names + Check (11-15)
-    names_section = clean[11:]
-    if not re.match(r'^[A-HJ-NP-Z0-9]{5}$', names_section):
-        raise ValueError("Names/check digits invalid (last 5 chars)")
-
-    # Return both the cleaned licence and a small set of derived attributes.
-    return clean, {"risk_score": 2 if age > 35 or age < 18 else 0}
+    return clean, {
+        "risk_score": 2 if age > 35 or age < 18 else 0,
+        "dob": dob.isoformat(),
+        "is_female": is_female,
+        "age": age,
+    }
 
 def validate_vehicle_reg(vehicle_registration: str) -> str:
     clean = re.sub(r'\s+', '', vehicle_registration.upper())
@@ -79,16 +102,64 @@ class DriverVerificationRequest(BaseModel):
     licence_number: str
     vehicle_registration: str
 
+
+class DriverValidationRequest(BaseModel):
+    """Validation payload (supports partial validation)."""
+    licence_number: str | None = None
+    vehicle_registration: str | None = None
+
+
+def validate_driver_fields(*, licence_number: str | None, vehicle_registration: str | None):
+    """Validate driver inputs and return (errors, cleaned, enriched)."""
+    errors: dict[str, str] = {}
+    cleaned: dict[str, str] = {}
+    enriched: dict[str, object] = {}
+
+    if licence_number is not None:
+        try:
+            validated_licence, licence_data = validate_licence(licence_number)
+            cleaned["licence_number"] = validated_licence
+            enriched["licence"] = licence_data
+        except ValueError as e:
+            errors["licence_number"] = str(e)
+
+    if vehicle_registration is not None:
+        try:
+            validated_reg = validate_vehicle_reg(vehicle_registration)
+            cleaned["vehicle_registration"] = validated_reg
+            enriched["vehicle"] = VEHICLE_DATABASE.get(validated_reg)
+        except ValueError as e:
+            errors["vehicle_registration"] = str(e)
+
+    return errors, cleaned, enriched
+
 @router.post("/lookup")
 def lookup_vehicle(registration: str):
     vehicle = VEHICLE_DATABASE.get(registration)
     if not vehicle:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Vehicle {registration} not found. Try: AB12CDE, BF59DZR, GF54LFK"
-        )
+        raise HTTPException(status_code=404, detail=f"Vehicle {registration} not found")
     return vehicle
 
+@router.post("/validate")
+def validate_driver_inputs(request: DriverValidationRequest):
+    """Live validation endpoint (no DB writes).
+
+    Returns a structured response so the frontend can show *field-level* errors live.
+    """
+    if request.licence_number is None and request.vehicle_registration is None:
+        raise HTTPException(status_code=400, detail={"field_errors": {"_": "Provide licence_number and/or vehicle_registration"}})
+
+    errors, cleaned, enriched = validate_driver_fields(
+        licence_number=request.licence_number,
+        vehicle_registration=request.vehicle_registration,
+    )
+
+    return {
+        "ok": len(errors) == 0,
+        "field_errors": errors,
+        "cleaned": cleaned,
+        "enriched": enriched,
+    }
 def _is_missing_column_error(err: Exception) -> bool:
     # PostgREST missing-column errors show up as code PGRST204.
     try:
@@ -117,18 +188,22 @@ def register_as_driver(
 ):
     user_id = get_profile_id(current_user["sub"])
 
-    try:
-        validated_licence, licence_data = validate_licence(request.licence_number)
-        validated_reg = validate_vehicle_reg(request.vehicle_registration)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    errors, cleaned, enriched = validate_driver_fields(
+        licence_number=request.licence_number,
+        vehicle_registration=request.vehicle_registration,
+    )
+    if errors:
+        raise HTTPException(status_code=400, detail={"field_errors": errors})
 
-    vehicle_info = lookup_vehicle(validated_reg)
+    validated_licence = cleaned["licence_number"]
+    validated_reg = cleaned["vehicle_registration"]
+    licence_data = enriched.get("licence") or {}
 
-    risk_score = licence_data["risk_score"]
-    auto_approved = risk_score <= 1 and vehicle_info["seats"] >= 3
+    vehicle_info = VEHICLE_DATABASE.get(validated_reg) or {"make": None, "model": None, "colour": None, "seats": 0}
 
-    # If user already tried before, UPDATE instead of failing.
+    risk_score = int(licence_data.get("risk_score", 2))
+    auto_approved = risk_score <= 1 and (vehicle_info.get("seats") or 0) >= 3
+
     existing = (
         supabase.table("driver_verification")
         .select("id")
@@ -138,7 +213,6 @@ def register_as_driver(
     )
     existing_id = existing.data[0]["id"] if existing.data else None
 
-    # Insert minimal required fields ONLY (schema-safe)
     base_payload = {
         "driver_id": user_id,
         "licence_number": validated_licence,
@@ -186,15 +260,13 @@ def get_my_driver_status(current_user: dict = Depends(get_current_user)):
 
     verification = (
         supabase.table("driver_verification")
-        .select("id, verified, vehicle_registration")
+        .select("*")
         .eq("driver_id", profile_id)
         .limit(1)
         .execute()
     )
 
     record = verification.data[0] if verification.data else None
-
-    # Treat "registered as driver" as having a verification row (verified or pending)
     is_driver = bool(record)
 
     return {"is_driver": is_driver, "verification": record}

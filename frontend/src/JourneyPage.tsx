@@ -241,8 +241,7 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
 };
 
 // ─── Main JourneyPage ──────────────────────────────────────────
-const JourneyPage: React.FC = () => {
-  const [mode, setMode] = useState<'user' | 'driver'>('user');
+const JourneyPage: React.FC<{ canUseDriverMode: boolean; onDriverSignup: () => void }> = ({ canUseDriverMode, onDriverSignup }) => {  const [mode, setMode] = useState<'user' | 'driver'>('user');
 
   const [activeUserTrips, setActiveUserTrips] = useState<any[]>([]);
   const [activeDriverRides, setActiveDriverRides] = useState<any[]>([]);
@@ -328,6 +327,7 @@ const JourneyPage: React.FC = () => {
           <button
             className={`toggle-tab ${mode === 'driver' ? 'toggle-tab-active' : ''}`}
             onClick={() => {
+              if (!canUseDriverMode) return onDriverSignup();
               setMode('driver');
             }}
           >
