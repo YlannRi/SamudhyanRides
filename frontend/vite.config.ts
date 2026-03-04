@@ -10,7 +10,12 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.{ts,tsx}'],
+      exclude: [
+        'src/components/Map/**',
+        //'src/lib/**',
+        'node_modules/**',
+        'dist/**'
+      ],
     },
     globals: true,
     setupFiles: './src/setupTests.ts',
