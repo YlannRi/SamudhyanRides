@@ -39,3 +39,5 @@ htmlcov/
 
 # Misc
 *.log
+
+node_modules
