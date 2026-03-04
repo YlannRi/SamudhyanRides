@@ -166,6 +166,6 @@ describe('LoginPage Component', () => {
         emailOrUsername: 'mark@bath.ac.uk',
       });
     });
-    
+
   });
 });
