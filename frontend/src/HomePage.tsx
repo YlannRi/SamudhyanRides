@@ -181,8 +181,17 @@ const HomePage: React.FC<HomePageProps> = ({
       {/* Save place modal */}
       {showSavePlace && (
         <div className="modal-backdrop" onClick={() => setShowSavePlace(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 10 }}>Save a place</div>
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="save-place-title"
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div id="save-place-title" style={{ fontWeight: 900, fontSize: 16, marginBottom: 10 }}>
+              Save a place
+            </div>
 
             <div className="modal-grid">
               <label className="modal-field">
@@ -191,6 +200,8 @@ const HomePage: React.FC<HomePageProps> = ({
                   value={placeForm.label}
                   onChange={(e) => setPlaceForm((p) => ({ ...p, label: e.target.value }))}
                   placeholder="e.g. Home"
+                  type="text"
+                  autoComplete="off"
                 />
               </label>
 
@@ -200,6 +211,8 @@ const HomePage: React.FC<HomePageProps> = ({
                   value={placeForm.address}
                   onChange={(e) => setPlaceForm((p) => ({ ...p, address: e.target.value }))}
                   placeholder="e.g. 12 Example Street"
+                  type="text"
+                  autoComplete="street-address"
                 />
               </label>
 
@@ -209,6 +222,8 @@ const HomePage: React.FC<HomePageProps> = ({
                   value={placeForm.postcode}
                   onChange={(e) => setPlaceForm((p) => ({ ...p, postcode: e.target.value }))}
                   placeholder="e.g. BA2 7AY"
+                  type="text"
+                  autoComplete="postal-code"
                 />
               </label>
 
@@ -218,15 +233,18 @@ const HomePage: React.FC<HomePageProps> = ({
                   value={placeForm.city}
                   onChange={(e) => setPlaceForm((p) => ({ ...p, city: e.target.value }))}
                   placeholder="e.g. Bath"
+                  type="text"
+                  autoComplete="address-level2"
                 />
               </label>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
-              <button className="sheet-action-btn btn-cancel" onClick={() => setShowSavePlace(false)}>
+              <button type="button" className="sheet-action-btn btn-cancel" onClick={() => setShowSavePlace(false)}>
                 Cancel
               </button>
               <button
+                type="button"
                 className="sheet-action-btn btn-accept"
                 onClick={submitPlace}
                 disabled={!placeForm.address.trim() || !placeForm.postcode.trim()}

@@ -266,35 +266,71 @@ const SafetyCheckupPage: React.FC<SafetyCheckupPageProps> = ({ onBack }) => {
 
         {showAddContact && (
           <div className="modal-backdrop" onClick={() => setShowAddContact(false)}>
-            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-              <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 10 }}>Add trusted contact</div>
+            <div
+              className="modal-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="add-trusted-contact-title"
+              tabIndex={-1}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div id="add-trusted-contact-title" style={{ fontWeight: 900, fontSize: 16, marginBottom: 10 }}>
+                Add trusted contact
+              </div>
               <div className="modal-grid">
                 <label className="modal-field">
                   <span>First name</span>
-                  <input value={form.firstName} onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))} />
+                  <input
+                    value={form.firstName}
+                    onChange={(e) => setForm((p) => ({ ...p, firstName: e.target.value }))}
+                    type="text"
+                    autoComplete="given-name"
+                  />
                 </label>
                 <label className="modal-field">
                   <span>Last name</span>
-                  <input value={form.lastName} onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))} />
+                  <input
+                    value={form.lastName}
+                    onChange={(e) => setForm((p) => ({ ...p, lastName: e.target.value }))}
+                    type="text"
+                    autoComplete="family-name"
+                  />
                 </label>
                 <label className="modal-field">
                   <span>Phone number</span>
-                  <input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} />
+                  <input
+                    value={form.phone}
+                    onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
+                  />
                 </label>
                 <label className="modal-field">
                   <span>Address (optional)</span>
-                  <input value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} />
+                  <input
+                    value={form.address}
+                    onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+                    type="text"
+                    autoComplete="street-address"
+                  />
                 </label>
                 <label className="modal-field">
                   <span>Email (optional)</span>
-                  <input value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} />
+                  <input
+                    value={form.email}
+                    onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                    type="email"
+                    autoComplete="email"
+                  />
                 </label>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 14 }}>
-                <button className="sheet-action-btn btn-cancel" onClick={() => setShowAddContact(false)}>
+                <button type="button" className="sheet-action-btn btn-cancel" onClick={() => setShowAddContact(false)}>
                   Cancel
                 </button>
                 <button
+                  type="button"
                   className="sheet-action-btn btn-accept"
                   onClick={submitContact}
                   disabled={!form.firstName.trim() || !form.lastName.trim() || !form.phone.trim()}

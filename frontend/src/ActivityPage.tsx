@@ -66,7 +66,9 @@ const RatingUI: React.FC<{
       </div>
       <div className="rating-stars">
         {[1, 2, 3, 4, 5].map(n => (
-          <button key={n}
+          <button
+            key={n}
+            type="button"
             className={`rating-star${n <= display ? ' rating-star-filled' : ''}`}
             onMouseEnter={() => setHovered(n)} onMouseLeave={() => setHovered(0)}
             onClick={() => setSelected(n)} aria-label={`${n} star`}
@@ -82,8 +84,10 @@ const RatingUI: React.FC<{
         {display ? RATING_LABELS[display] : '‎'}
       </div>
       <div className="rating-modal-actions">
-        <button className="rating-btn-cancel" onClick={onClose}>Cancel</button>
-        <button className={`rating-btn-submit${selected ? ' rating-btn-submit-active' : ''}`}
+        <button type="button" className="rating-btn-cancel" onClick={onClose}>Cancel</button>
+        <button
+          type="button"
+          className={`rating-btn-submit${selected ? ' rating-btn-submit-active' : ''}`}
           onClick={() => selected && onSubmit(selected)} disabled={!selected}>
           Submit Rating
         </button>
@@ -126,8 +130,10 @@ const ReportUI: React.FC<{
         rows={4}
       />
       <div className="rating-modal-actions">
-        <button className="rating-btn-cancel" onClick={onClose}>Cancel</button>
-        <button className={`rating-btn-submit report-btn${text.trim() ? ' rating-btn-submit-active report-btn-active' : ''}`}
+        <button type="button" className="rating-btn-cancel" onClick={onClose}>Cancel</button>
+        <button
+          type="button"
+          className={`rating-btn-submit report-btn${text.trim() ? ' rating-btn-submit-active report-btn-active' : ''}`}
           onClick={() => text.trim() && onSubmit(text)} disabled={!text.trim()}>
           Send Report
         </button>
@@ -147,8 +153,8 @@ const ConfirmUI: React.FC<{
     <div className="rating-title">{title}</div>
     <div className="rating-subtitle">{body}</div>
     <div className="rating-modal-actions" style={{ marginTop: 8 }}>
-      <button className="rating-btn-cancel" onClick={onClose}>Go Back</button>
-      <button className={`rating-btn-submit rating-btn-submit-active ${confirmCls}`} onClick={onConfirm}>
+      <button type="button" className="rating-btn-cancel" onClick={onClose}>Go Back</button>
+      <button type="button" className={`rating-btn-submit rating-btn-submit-active ${confirmCls}`} onClick={onConfirm}>
         {confirmLabel}
       </button>
     </div>
@@ -177,8 +183,7 @@ const Modal: React.FC<{
   onConfirmAction?: () => Promise<boolean>;
 }> = ({ state, onClose, onDone, onConfirmAction }) => {
 
-
-
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const [inner, setInner] = useState<ModalState>(state);
 
   const succeed = (icon: string, title: string, sub: string) => {
@@ -188,10 +193,70 @@ const Modal: React.FC<{
 
   const isSuccess = inner.type === 'success';
 
+  const modalTitle = (() => {
+    switch (inner.type) {
+      case 'rating':
+        return 'How was your trip?';
+      case 'report':
+        return 'Report an Issue';
+      case 'cancel':
+      case 'start':
+        return inner.title;
+      case 'accept':
+        return `Accept ${inner.passengerName}?`;
+      case 'deny':
+        return `Deny ${inner.passengerName}?`;
+      case 'remove':
+        return `Remove ${inner.passengerName}?`;
+      case 'success':
+        return inner.title;
+      default:
+        return 'Dialog';
+    }
+  })();
+
+  React.useEffect(() => {
+    // Move focus into the dialog when it opens
+    window.setTimeout(() => dialogRef.current?.focus(), 0);
+  }, []);
+
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (isSuccess) return;
+      e.preventDefault();
+      onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isSuccess, onClose]);
+
+  const srOnly: React.CSSProperties = {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    padding: 0,
+    margin: -1,
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    border: 0,
+  };
+
   return (
     <>
       <div className="rating-modal-overlay" onClick={isSuccess ? undefined : onClose} />
-      <div className={`rating-modal${isSuccess ? ' rating-modal-submitted' : ''}`}>
+      <div
+        ref={dialogRef}
+        className={`rating-modal${isSuccess ? ' rating-modal-submitted' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="activity-modal-title"
+        tabIndex={-1}
+      >
+        <h2 id="activity-modal-title" style={srOnly}>
+          {modalTitle}
+        </h2>
         <div className="rating-modal-handle-area"><div className="sheet-handle" /></div>
 
         {isSuccess && inner.type === 'success' ? (

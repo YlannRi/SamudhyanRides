@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { apiFetch } from './lib/api';
 
 const BackIcon = (
@@ -101,24 +101,44 @@ const Field: React.FC<{
   disabled?: boolean;
   hint?: string;
   error?: string | null;
-}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', required, disabled, hint, error }) => (
-  <div className="auth-field">
-    <label className="auth-label">{label}</label>
-    <input
-      className="auth-input"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onBlur}
-      placeholder={placeholder}
-      type={type}
-      required={required}
-      disabled={disabled}
-      aria-invalid={Boolean(error) || undefined}
-    />
-    {hint && !error && <div style={{ marginTop: 6, color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{hint}</div>}
-    {error && <div style={{ marginTop: 6, color: '#f87171', fontSize: 12 }}>{error}</div>}
-  </div>
-);
+}> = ({ label, value, onChange, onBlur, placeholder, type = 'text', required, disabled, hint, error }) => {
+  const inputId = useId();
+  const hintId = hint ? `${inputId}-hint` : undefined;
+  const errId = error ? `${inputId}-err` : undefined;
+  const describedBy = [hintId, errId].filter(Boolean).join(' ') || undefined;
+
+  return (
+    <div className="auth-field">
+      <label className="auth-label" htmlFor={inputId}>
+        {label}
+      </label>
+      <input
+        id={inputId}
+        className="auth-input"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        placeholder={placeholder}
+        type={type}
+        required={required}
+        aria-required={required || undefined}
+        disabled={disabled}
+        aria-invalid={Boolean(error) || undefined}
+        aria-describedby={describedBy}
+      />
+      {hint && !error && (
+        <div id={hintId} style={{ marginTop: 6, color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>
+          {hint}
+        </div>
+      )}
+      {error && (
+        <div id={errId} role="alert" style={{ marginTop: 6, color: '#f87171', fontSize: 12 }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const FileField: React.FC<{
   label: string;
@@ -127,23 +147,43 @@ const FileField: React.FC<{
   required?: boolean;
   hint?: string;
   error?: string | null;
-}> = ({ label, onPick, onBlur, required, hint, error }) => (
-  <div className="auth-field">
-    <label className="auth-label">{label}</label>
-    <input
-      className="auth-input"
-      style={{ paddingTop: 10 }}
-      type="file"
-      accept="image/*,.pdf"
-      onChange={(e) => onPick(e.target.files?.[0] ?? null)}
-      onBlur={onBlur}
-      required={required}
-      aria-invalid={Boolean(error) || undefined}
-    />
-    {hint && !error && <div style={{ marginTop: 6, color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{hint}</div>}
-    {error && <div style={{ marginTop: 6, color: '#f87171', fontSize: 12 }}>{error}</div>}
-  </div>
-);
+}> = ({ label, onPick, onBlur, required, hint, error }) => {
+  const inputId = useId();
+  const hintId = hint ? `${inputId}-hint` : undefined;
+  const errId = error ? `${inputId}-err` : undefined;
+  const describedBy = [hintId, errId].filter(Boolean).join(' ') || undefined;
+
+  return (
+    <div className="auth-field">
+      <label className="auth-label" htmlFor={inputId}>
+        {label}
+      </label>
+      <input
+        id={inputId}
+        className="auth-input"
+        style={{ paddingTop: 10 }}
+        type="file"
+        accept="image/*,.pdf"
+        onChange={(e) => onPick(e.target.files?.[0] ?? null)}
+        onBlur={onBlur}
+        required={required}
+        aria-required={required || undefined}
+        aria-invalid={Boolean(error) || undefined}
+        aria-describedby={describedBy}
+      />
+      {hint && !error && (
+        <div id={hintId} style={{ marginTop: 6, color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>
+          {hint}
+        </div>
+      )}
+      {error && (
+        <div id={errId} role="alert" style={{ marginTop: 6, color: '#f87171', fontSize: 12 }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const DriverSignupPage: React.FC<DriverSignupPageProps> = ({ onBack, onComplete }) => {
   const draft = useMemo(() => {

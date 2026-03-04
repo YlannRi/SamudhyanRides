@@ -135,7 +135,12 @@ export const Btn: React.FC<{ cls: string; icon: React.ReactNode; label: string; 
   small,
   onClick,
 }) => (
-  <button className={`sheet-action-btn ${cls}${small ? ' btn-small' : ''}`} onClick={onClick}>
+  <button
+    type="button"
+    className={`sheet-action-btn ${cls}${small ? ' btn-small' : ''}`}
+    onClick={onClick}
+    aria-label={label}
+  >
     {icon}
     {label}
   </button>
@@ -290,7 +295,9 @@ const App: React.FC = () => {
 
   return (
     <div className="uber-page">
-      <div className="uber-container">
+      <a className="skip-link" href="#main-content">Skip to main content</a>
+
+      <main id="main-content" className="uber-container" role="main" tabIndex={-1}>
         {isAuthenticated ? (
           renderAuthedContent()
         ) : authScreen === 'driverSignup' ? (
@@ -310,16 +317,23 @@ const App: React.FC = () => {
             }}
           />
         )}
-      </div>
+      </main>
 
       {isAuthenticated && (
-        <nav className="bottom-nav">
-          <button className={`nav-item ${activeTab === 'home' ? 'nav-item-active' : ''}`} onClick={() => setActiveTab('home')}>
+        <nav className="bottom-nav" aria-label="Primary">
+          <button
+            type="button"
+            aria-current={activeTab === 'home' ? 'page' : undefined}
+            className={`nav-item ${activeTab === 'home' ? 'nav-item-active' : ''}`}
+            onClick={() => setActiveTab('home')}
+          >
             <div className="nav-icon">🚗</div>
             <div className="nav-label">Home</div>
           </button>
 
           <button
+            type="button"
+            aria-current={activeTab === 'journey' ? 'page' : undefined}
             className={`nav-item ${activeTab === 'journey' ? 'nav-item-active' : ''}`}
             onClick={() => setActiveTab('journey')}
           >
@@ -328,6 +342,8 @@ const App: React.FC = () => {
           </button>
 
           <button
+            type="button"
+            aria-current={activeTab === 'activity' ? 'page' : undefined}
             className={`nav-item ${activeTab === 'activity' ? 'nav-item-active' : ''}`}
             onClick={() => setActiveTab('activity')}
           >
@@ -336,6 +352,8 @@ const App: React.FC = () => {
           </button>
 
           <button
+            type="button"
+            aria-current={activeTab === 'account' ? 'page' : undefined}
             className={`nav-item ${activeTab === 'account' ? 'nav-item-active' : ''}`}
             onClick={() => setActiveTab('account')}
           >
