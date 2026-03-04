@@ -1,16 +1,13 @@
-// src/AccountPage.test.tsx
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AccountPage from './AccountPage';
 import { apiFetch } from './lib/api';
 
-// Mock the custom API fetcher
 vi.mock('./lib/api', () => ({
   apiFetch: vi.fn(),
 }));
 
 describe('AccountPage Component', () => {
-  // Dummy
   const mockProps = {
     onLogout: vi.fn(),
     onOpenSettings: vi.fn(),
@@ -19,9 +16,8 @@ describe('AccountPage Component', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks(); // Clear history between tests
+    vi.clearAllMocks();
 
-    // Mock localStorage
     const store: Record<string, string> = {
       authToken: 'fake-jwt-token',
       trustedContacts: JSON.stringify([{ id: '1', firstName: 'Jane', lastName: 'Doe', phone: '07123456789', isPrimary: true }])
@@ -29,7 +25,6 @@ describe('AccountPage Component', () => {
 
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => store[key] || null);
 
-    // Mock window.location (to prevent test crashes when calling tel:)
     Object.defineProperty(window, 'location', {
       value: { href: '' },
       writable: true,
@@ -37,7 +32,6 @@ describe('AccountPage Component', () => {
   });
 
   it('fetches and displays user profile successfully', async () => {
-    // Tell the mocked API what to return
     vi.mocked(apiFetch).mockResolvedValueOnce([{
       first_name: 'Alex',
       last_name: 'Smith',
@@ -46,10 +40,8 @@ describe('AccountPage Component', () => {
 
     render(<AccountPage {...mockProps} />);
 
-    // Initially, it should say Loading
     expect(screen.getByText('Loading...')).toBeInTheDocument();
 
-    // Wait for the API call to resolve and the UI to update
     await waitFor(() => {
       expect(screen.getByText('Alex Smith')).toBeInTheDocument();
       expect(screen.getByText('★ 4.85')).toBeInTheDocument();
@@ -61,12 +53,147 @@ describe('AccountPage Component', () => {
 
     render(<AccountPage {...mockProps} />);
 
-    // Find and click the Safety Alarm button
-    const safetyButton = screen.getByText('Safety Alarm');
-    fireEvent.click(safetyButton);
+    fireEvent.click(screen.getByText('Safety Alarm'));
 
-    // The modal should now be visible
     expect(screen.getByText('Safety Toolkit')).toBeInTheDocument();
     expect(screen.getByText('Call your trusted contact (Jane Doe)')).toBeInTheDocument();
+  });
+
+  it('handles API fetch error gracefully', async () => {
+    vi.mocked(apiFetch).mockRejectedValueOnce(new Error('Network error'));
+
+    render(<AccountPage {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Unknown User')).toBeInTheDocument();
+      expect(screen.getByText('★ N/A')).toBeInTheDocument();
+    });
+  });
+
+  it('handles empty API response gracefully', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce([]);
+
+    render(<AccountPage {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Unknown User')).toBeInTheDocument();
+    });
+  });
+
+  it('calls onOpenSettings when Settings is clicked', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+    render(<AccountPage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Settings'));
+    expect(mockProps.onOpenSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onOpenTimetable when timetable card is clicked', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+    render(<AccountPage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Your timetable'));
+    expect(mockProps.onOpenTimetable).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onOpenSafetyCheckup when safety check-up card is clicked', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+    render(<AccountPage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Safety check-up'));
+    expect(mockProps.onOpenSafetyCheckup).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls logout endpoint and triggers onLogout', async () => {
+    vi.mocked(apiFetch).mockResolvedValue([{ first_name: 'Alex', rider_rating: 4.0 }]);
+    render(<AccountPage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Logout'));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith('auth/logout', { method: 'POST' });
+      expect(mockProps.onLogout).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('still calls onLogout if logout API throws', async () => {
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }])
+      .mockRejectedValueOnce(new Error('Logout failed'));
+
+    render(<AccountPage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Logout'));
+
+    await waitFor(() => {
+      expect(mockProps.onLogout).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('calls 999 when Call 999 button is clicked in safety toolkit', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+    render(<AccountPage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Safety Alarm'));
+    fireEvent.click(screen.getByText('Call 999'));
+
+    expect(window.location.href).toBe('tel:999');
+  });
+
+  it('calls trusted contact when button is clicked in safety toolkit', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+    render(<AccountPage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Safety Alarm'));
+    fireEvent.click(screen.getByText('Call your trusted contact (Jane Doe)'));
+
+    expect(window.location.href).toBe('tel:07123456789');
+  });
+
+  it('calls campus security when button is clicked in safety toolkit', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+    render(<AccountPage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Safety Alarm'));
+    fireEvent.click(screen.getByText('Call campus security (01225 383999)'));
+
+    expect(window.location.href).toBe('tel:01225383999');
+  });
+
+  it('closes safety toolkit when Close is clicked', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+    render(<AccountPage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Safety Alarm'));
+    expect(screen.getByText('Safety Toolkit')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Close'));
+    expect(screen.queryByText('Safety Toolkit')).not.toBeInTheDocument();
+  });
+
+  it('closes safety toolkit when backdrop is clicked', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+    render(<AccountPage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Safety Alarm'));
+    fireEvent.click(document.querySelector('.modal-backdrop')!);
+
+    expect(screen.queryByText('Safety Toolkit')).not.toBeInTheDocument();
+  });
+
+  it('disables trusted contact button when no trusted contacts exist', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => {
+      if (key === 'authToken') return 'fake-jwt-token';
+      if (key === 'trustedContacts') return JSON.stringify([]);
+      return null;
+    });
+
+    vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+    render(<AccountPage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Safety Alarm'));
+
+    const contactBtn = screen.getByText(/Call your trusted contact$/);
+    expect(contactBtn).toBeDisabled();
   });
 });
