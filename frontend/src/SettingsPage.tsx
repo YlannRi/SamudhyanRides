@@ -20,7 +20,7 @@ const DetailRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label,
   </div>
 );
 
-// set up which fields will be displayed to users
+// sets up which fields will be displayed to users
 const PROFILE_FIELDS = [
     'first_name',
     'last_name',
@@ -31,7 +31,7 @@ const PROFILE_FIELDS = [
     'gender',
 ]
 
-// set up which fields will be shown to drivers
+// sets up which fields will be shown to drivers
 const DRIVER_FIELDS = [
     'verified',
     'vehicle_registration',
