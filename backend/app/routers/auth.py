@@ -7,7 +7,7 @@ import re
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 class LoginRequest(BaseModel):
-    email: str
+    identifier: str
     password: str
 
 class RegisterRequest(BaseModel):
@@ -50,7 +50,7 @@ def register(request: RegisterRequest):
         first_name = name_parts[0]
         last_name = name_parts[1] if len(name_parts) > 1 else ""
 
-        uni_username = request.email.split("@")[0]
+        uni_username = request.email.split("@")[0].lower()
 
         # Create user profile row with the new data
         supabase.table("user_profiles").insert({
@@ -72,8 +72,18 @@ def register(request: RegisterRequest):
 @router.post("/login")
 def login(request: LoginRequest):
     try:
+        identifier = request.identifier
+
+        user_lookup = supabase.table("user_profiles") \
+                .select("email") \
+                .eq("university_username", identifier) \
+                .execute()
+
+        if user_lookup.data:
+            identifier = user_lookup.data[0]["email"]
+
         response = supabase.auth.sign_in_with_password({
-            "email": request.email,
+            "email": identifier,
             "password": request.password
         })
 

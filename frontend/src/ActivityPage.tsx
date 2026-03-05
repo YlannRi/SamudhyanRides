@@ -5,6 +5,7 @@ import React, {useRef, useState} from 'react';
 import './ActivityPage.css';
 import {Btn, DetailRow, Icons, MapPlaceholder} from './App.tsx'
 import {RideRenderMap} from './components/Map/RideRenderMap';
+import { apiFetch } from './lib/api';
 
 type Trip = {
   id: number;
@@ -496,50 +497,39 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
   // Called when action is confirmed + success shown — dismiss modal then sheet
   const doneModal = () => { setModal(null); close(); };
 
-// 1. Add 'startRide' to the type signature
+// Add 'startRide' to the type signature
 const handleAction = async (type: 'accept' | 'deny' | 'cancelBooking' | 'removePassenger' | 'cancelRide' | 'startRide', targetId: number) => {
   try {
-    const token = localStorage.getItem('authToken');
-    if (!token) throw new Error("No token found");
-
     let endpoint = '';
     let method = 'DELETE';
-    let body: string | undefined = undefined; // <-- Add support for JSON bodies
+    let body: string | undefined = undefined;
 
     switch (type) {
       case 'accept':
-        endpoint = `https://localhost:8000/bookings/${targetId}/accept`;
+        endpoint = `bookings/${targetId}/accept`;
         method = 'PUT';
         break;
       case 'deny':
       case 'cancelBooking':
       case 'removePassenger':
-        endpoint = `https://localhost:8000/bookings/${targetId}`;
+        endpoint = `bookings/${targetId}`;
         method = 'DELETE';
         break;
       case 'cancelRide':
-        endpoint = `https://localhost:8000/rides/${targetId}`;
+        endpoint = `rides/${targetId}`;
         method = 'DELETE';
         break;
-      // 2. Add the startRide case
       case 'startRide':
-        endpoint = `https://localhost:8000/rides/${targetId}`;
+        endpoint = `rides/${targetId}`;
         method = 'PUT';
         body = JSON.stringify({ status: 'in_progress' });
         break;
     }
 
-    // 3. Include headers and body in the fetch call
-    const response = await fetch(endpoint, {
+    await apiFetch(endpoint, {
       method,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        ...(body ? { 'Content-Type': 'application/json' } : {})
-      },
-      body
+      ...(body ? { body, headers: { 'Content-Type': 'application/json' } } : {})
     });
-
-    if (!response.ok) throw new Error(`${type} failed`);
 
     return true;
   } catch (err) {
@@ -547,7 +537,6 @@ const handleAction = async (type: 'accept' | 'deny' | 'cancelBooking' | 'removeP
     return false;
   }
 };
-
   const onTouchStart = (e: React.TouchEvent) => { touchStartY.current = e.touches[0].clientY; };
   const onTouchEnd = (e: React.TouchEvent) => {
     if (touchStartY.current !== null && e.changedTouches[0].clientY - touchStartY.current > 80) close();
@@ -895,102 +884,85 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchActivity = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const token = localStorage.getItem('authToken');
-      if (!token) throw new Error("No token found");
+const fetchActivity = async () => {
+  setLoading(true);
+  setError(null);
+  try {
+    if (mode === 'user') {
+      const data = await apiFetch<any>('bookings/me', { method: 'GET' });
 
-      if (mode === 'user') {
-        const response = await fetch('https://localhost:8000/bookings/me', {
-          headers: { 'Authorization': `Bearer ${token}` }
+      const transformed: Trip[] = data.map((b: any) => {
+        const rideData = b.ride || {};
+
+        return {
+          id: b.id,
+          ride_id: b.ride_id,
+          username: rideData.driver?.first_name ? `${rideData.driver.first_name} ${rideData.driver.last_name}` :
+            b.passenger_name || `User ${b.user_id?.substring(0, 4)}`,
+          destination: b.dropoff_location || rideData.destination || 'Destination',
+          time: b.pickup_time || rideData.departure_time || 'Pending',
+          price: `£${b.price || '0.00'}`,
+          status: b.status === 'pending' ? 'requested' :
+            b.status === 'confirmed' ? (rideData.status === 'in_progress' ? 'activeUser' : 'upcomingUser') :
+              b.status === 'completed' ? 'pastUser' : 'cancelled',
+          action: 'More',
+          pickup_lat: b.pickup_lat,
+          pickup_lng: b.pickup_lng
+        };
+      }).filter((t: Trip) => t.status !== 'cancelled');
+      setBookings(transformed);
+    } else {
+      const ridesData = await apiFetch<any>('rides/driver/dashboard', { method: 'GET' });
+
+      const finalDriverActivities: Trip[] = [];
+      ridesData.forEach((ride: any) => {
+        finalDriverActivities.push({
+          id: ride.id,
+          ride_id: ride.id,
+          destination: ride.destination,
+          time: ride.departure_time,
+          status: ride.status === 'completed' ? 'pastDriver' :
+                  ride.status === 'in_progress' ? 'activeDriver' : 'upcomingDriver',
+          action: 'More',
+          numberPassengers: ride.seats_total - ride.seats_available,
+          passengers: ride.bookings
+            .filter((b: any) => b.status === 'confirmed')
+            .map((b: any) => ({
+              id: b.id,
+              name: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown',
+              rating: b.passenger?.rider_rating,
+              pickupLocation: b.pickup_location,
+              cost: `£${b.price}`,
+              rated: false
+            }))
         });
-        if (!response.ok) throw new Error("Failed to fetch rider activity");
-        const data = await response.json();
 
-        const transformed: Trip[] = data.map((b: any) => {
-          // Fallback to check 'rides' or 'ride' depending on Supabase structure
-          const rideData = b.ride || {};
-
-          return {
-            id: b.id,
-            ride_id: b.ride_id,
-            username: rideData.driver?.first_name ? `${rideData.driver.first_name} ${rideData.driver.last_name}` :
-              b.passenger_name || `User ${b.user_id?.substring(0, 4)}`,
-            destination: b.dropoff_location || rideData.destination || 'Destination',
-            time: b.pickup_time || rideData.departure_time || 'Pending',
-            price: `£${b.price || '0.00'}`,
-
-            // MAP STATUS HERE: Check the nested ride status to override the booking status
-            status: b.status === 'pending' ? 'requested' :
-              b.status === 'confirmed' ? (rideData.status === 'in_progress' ? 'activeUser' : 'upcomingUser') :
-                b.status === 'completed' ? 'pastUser' : 'cancelled',
-
-            action: 'More',
-            pickup_lat: b.pickup_lat,
-            pickup_lng: b.pickup_lng
-          };
-        }).filter((t: Trip) => t.status !== 'cancelled');
-        setBookings(transformed);
-      } else {
-        const response = await fetch('https://localhost:8000/rides/driver/dashboard', {
-          headers: { 'Authorization': `Bearer ${token}` }
+        ride.bookings.forEach((b: any) => {
+          if (b.status === 'pending') {
+            finalDriverActivities.push({
+              id: b.id,
+              ride_id: ride.id,
+              username: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown Passenger',
+              destination: b.dropoff_location,
+              time: b.pickup_time || ride.departure_time,
+              price: `£${b.price}`,
+              status: 'passengerRequest',
+              action: 'More',
+              pickup_lat: b.pickup_lat,
+              pickup_lng: b.pickup_lng
+            });
+          }
         });
-        if (!response.ok) throw new Error("Failed to fetch driver dashboard");
-        const ridesData = await response.json();
-
-        const finalDriverActivities: Trip[] = [];
-        ridesData.forEach((ride: any) => {
-          // Add the ride itself (for upcoming/past)
-          finalDriverActivities.push({
-            id: ride.id,
-            ride_id: ride.id,
-            destination: ride.destination,
-            time: ride.departure_time,
-            status: ride.status === 'completed' ? 'pastDriver' :
-                    ride.status === 'in_progress' ? 'activeDriver' : 'upcomingDriver',
-            action: 'More',
-            numberPassengers: ride.seats_total - ride.seats_available,
-            passengers: ride.bookings
-              .filter((b: any) => b.status === 'confirmed')
-              .map((b: any) => ({
-                id: b.id,
-                name: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown',
-                rating: b.passenger?.rider_rating,
-                pickupLocation: b.pickup_location,
-                cost: `£${b.price}`,
-                rated: false // Placeholder for now
-              }))
-          });
-
-          // Add each pending booking (for requests)
-          ride.bookings.forEach((b: any) => {
-            if (b.status === 'pending') {
-              finalDriverActivities.push({
-                id: b.id,
-                ride_id: ride.id,
-                username: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown Passenger',
-                destination: b.dropoff_location,
-                time: b.pickup_time || ride.departure_time,
-                price: `£${b.price}`,
-                status: 'passengerRequest',
-                action: 'More',
-                pickup_lat: b.pickup_lat,
-                pickup_lng: b.pickup_lng
-              });
-            }
-          });
-        });
-        setBookings(finalDriverActivities);
-      }
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      });
+      setBookings(finalDriverActivities);
     }
-  };
+  } catch (err: any) {
+    console.error(err);
+    setError(err.message || 'An error occurred');
+  } finally {
+    setLoading(false);
+  }
+};
 
   React.useEffect(() => {
     fetchActivity();

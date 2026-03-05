@@ -53,7 +53,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
 
         const payload =
             mode === 'login'
-                ? { email: emailOrUsername, password }
+                ? { identifier: emailOrUsername, password }
                 : {
                     email: emailOrUsername,
                     password,
@@ -223,12 +223,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                     )}
 
                     <div className="auth-field">
-                        <label className="auth-label" htmlFor="email">Email or university username</label>
+                        <label className="auth-label" htmlFor="email">{mode === 'login' ? 'Email or university username' : 'Email'}</label>
                         <input
                             id="email"
                             type="text"
                             className="auth-input"
-                            placeholder="you@bath.ac.uk or abc123"
+                            placeholder={mode === 'login' ? 'you@bath.ac.uk or abc123' : 'you@bath.ac.uk'}
                             value={emailOrUsername}
                             onChange={(e) => setEmailOrUsername(e.target.value)}
                             required

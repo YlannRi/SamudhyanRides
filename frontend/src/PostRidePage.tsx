@@ -175,7 +175,6 @@ const PostRidePage: React.FC = () => {
               />
             </div>
           </div>
-
           <button type="submit" className="auth-submit" disabled={loading} style={{ marginTop: '12px' }}>
             {loading ? 'Posting...' : 'Post Ride'}
           </button>

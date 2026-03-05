@@ -36,6 +36,9 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+coverage/
 
 # Misc
 *.log
+
+node_modules
