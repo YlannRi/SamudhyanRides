@@ -91,6 +91,43 @@ class TestDriverDashboard:
         assert response.status_code == 200
         assert response.json()[0]["bookings"] == []
 
+    def test_returns_rides_with_bookings_and_passengers(self, client):
+        fake_ride = {"id": "ride-1", "origin": "Bath", "destination": "Bristol"}
+        fake_booking = {"id": "book-1", "ride_id": "ride-1", "passenger_id": "pass-1"}
+        fake_profile = {"id": "pass-1", "first_name": "Alice"}
+
+        with patch("app.routers.rides.supabase") as mock_sb:
+            mock_sb_execute = MagicMock()
+            mock_sb_execute.execute.side_effect = [
+                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),
+                MagicMock(data=[fake_ride]),
+                MagicMock(data=[fake_booking]),
+                MagicMock(data=[fake_profile]),
+            ]
+
+            def fake_table(name):
+                tm = MagicMock()
+                if name == "user_profiles":
+                    # First time: eq (for get_profile_id), Second time: in_ (for passengers)
+                    # We can map them all to one MagicMock since we rely on `side_effect`
+                    tm.select.return_value.eq.return_value = mock_sb_execute
+                    tm.select.return_value.in_.return_value = mock_sb_execute
+                elif name == "rides":
+                    tm.select.return_value.eq.return_value.neq.return_value.neq.return_value = mock_sb_execute
+                elif name == "bookings":
+                    tm.select.return_value.in_.return_value = mock_sb_execute
+                return tm
+            
+            mock_sb.table.side_effect = fake_table
+
+            response = client.get("/rides/driver/dashboard")
+
+        assert response.status_code == 200
+        rides = response.json()
+        assert len(rides) == 1
+        assert len(rides[0]["bookings"]) == 1
+        assert rides[0]["bookings"][0]["passenger"]["first_name"] == "Alice"
+
 
 # ---------------------------------------------------------------------------
 # POST /rides/
@@ -159,6 +196,23 @@ class TestSearchRides:
         assert response.status_code == 200
         assert len(response.json()) == 2
 
+    def test_returns_filtered_rides(self, client):
+        fake_rides = [{"id": "r1", "origin": "Bath", "destination": "Bristol", "status": "open"}]
+        with patch("app.routers.rides.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+            # the query will have multiple chain links, let's mock the final execute
+            mock_query = MagicMock()
+            mock_query.execute.return_value.data = fake_rides
+            mock_query.ilike.return_value = mock_query
+            mock_query.gte.return_value = mock_query
+            
+            mock_sb.table.return_value.select.return_value.eq.return_value.neq.return_value = mock_query
+
+            response = client.get("/rides/", params={"origin": "Ba", "destination": "Bris", "min_seats": 2})
+
+        assert response.status_code == 200
+        assert len(response.json()) == 1
+
     def test_returns_empty_when_no_rides(self, client):
         with patch("app.routers.rides.supabase") as mock_sb:
             mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
@@ -214,6 +268,30 @@ class TestUpdateRide:
             mock_sb.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [updated_ride]
 
             response = client.put("/rides/ride-1", json={"status": "completed"})
+
+        assert response.status_code == 200
+
+    def test_update_seats_total_successfully(self, client):
+        existing_ride = {"id": "ride-1", "seats_total": 4, "seats_available": 3}
+        with patch("app.routers.rides.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+            mock_sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [existing_ride]
+            updated_ride = {**existing_ride, "seats_total": 5, "seats_available": 4}
+            mock_sb.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [updated_ride]
+
+            response = client.put("/rides/ride-1", json={"seats_total": 5})
+
+        assert response.status_code == 200
+
+    def test_update_departure_time_successfully(self, client):
+        existing_ride = {"id": "ride-1", "seats_total": 4, "seats_available": 3}
+        with patch("app.routers.rides.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+            mock_sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [existing_ride]
+            updated_ride = {**existing_ride, "departure_time": "2026-07-01T09:00:00"}
+            mock_sb.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [updated_ride]
+
+            response = client.put("/rides/ride-1", json={"departure_time": "2026-07-01T09:00:00"})
 
         assert response.status_code == 200
 

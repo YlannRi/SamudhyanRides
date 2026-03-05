@@ -25,6 +25,18 @@ def override_auth():
     yield
     app.dependency_overrides.clear()
 
+def test_generate_pickup_code():
+    from app.routers.bookings import generate_pickup_code
+    code = generate_pickup_code()
+    assert len(code) == 4
+    assert code.isdigit()
+
+def test_get_profile_id_not_found(client):
+    with patch("app.routers.bookings.supabase") as mock_sb:
+        mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+        response = client.get("/bookings/me")
+    assert response.status_code == 404
+    assert "User profile not found" in response.json()["detail"]
 
 # ---------------------------------------------------------------------------
 # POST /bookings/ (Request Booking)
@@ -92,6 +104,23 @@ class TestRequestBooking:
         assert response.status_code == 400
         assert "No seats available" in response.json()["detail"]
 
+    def test_fails_if_ride_not_found(self, client):
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),
+                MagicMock(data=[]), # Ride not found
+            ]
+
+            response = client.post("/bookings/", params={
+                "ride_id": "invalid-ride",
+                "pickup_location": "Bath",
+                "dropoff_location": "Bristol",
+                "price": 10.50
+            })
+
+        assert response.status_code == 404
+        assert "Ride not found" in response.json()["detail"]
+
 
 # ---------------------------------------------------------------------------
 # PUT /bookings/{booking_id}/accept
@@ -127,6 +156,44 @@ class TestAcceptBooking:
         assert response.status_code == 200
         assert response.json()["status"] == "confirmed"
 
+    def test_accept_fails_if_booking_not_found(self, client):
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),
+                MagicMock(data=[]), # Booking not found
+            ]
+            response = client.put("/bookings/book-1/accept")
+        assert response.status_code == 404
+
+    def test_accept_fails_if_not_your_ride(self, client):
+        fake_booking = {"id": "book-1", "ride_id": "ride-1"}
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),
+                MagicMock(data=[fake_booking]),
+            ]
+            mock_ride_query = MagicMock()
+            mock_ride_query.eq.return_value.execute.return_value.data = [] # Ride not found or not yours
+            mock_sb.table.return_value.select.return_value.eq.return_value = mock_ride_query
+
+            response = client.put("/bookings/book-1/accept")
+        assert response.status_code == 403
+
+    def test_accept_fails_if_no_seats(self, client):
+        fake_booking = {"id": "book-1", "ride_id": "ride-1"}
+        fake_ride = {"id": "ride-1", "seats_available": 0}
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),
+                MagicMock(data=[fake_booking]),
+            ]
+            mock_ride_query = MagicMock()
+            mock_ride_query.eq.return_value.execute.return_value.data = [fake_ride]
+            mock_sb.table.return_value.select.return_value.eq.return_value = mock_ride_query
+
+            response = client.put("/bookings/book-1/accept")
+        assert response.status_code == 400
+
 
 # ---------------------------------------------------------------------------
 # DELETE /bookings/{booking_id}
@@ -150,6 +217,38 @@ class TestCancelBooking:
         assert response.status_code == 200
         assert "cancelled" in response.json()["message"]
 
+    def test_cancel_fails_if_booking_not_found(self, client):
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),    
+                MagicMock(data=[]), # Booking missing
+            ]
+            response = client.delete("/bookings/book-1")
+        assert response.status_code == 404
+
+    def test_cancel_fails_if_ride_not_found(self, client):
+        fake_booking = {"id": "book-1", "ride_id": "ride-1", "passenger_id": FAKE_PROFILE_ID}
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),    
+                MagicMock(data=[fake_booking]),
+                MagicMock(data=[]), # Ride missing 
+            ]
+            response = client.delete("/bookings/book-1")
+        assert response.status_code == 404
+
+    def test_cancel_fails_if_unauthorized(self, client):
+        fake_booking = {"id": "book-1", "ride_id": "ride-1", "passenger_id": "other-passenger"}
+        fake_ride = {"id": "ride-1", "driver_id": "other-driver", "seats_available": 2}
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),    
+                MagicMock(data=[fake_booking]),
+                MagicMock(data=[fake_ride]),
+            ]
+            response = client.delete("/bookings/book-1")
+        assert response.status_code == 403
+
 
 # ---------------------------------------------------------------------------
 # GET /bookings/me
@@ -168,6 +267,37 @@ class TestGetMyBookings:
 
         assert response.status_code == 200
         assert response.json() == []
+
+    def test_returns_nested_bookings(self, client):
+        fake_bookings = [{"id": "book-1", "ride_id": "ride-1"}]
+        fake_rides = [{"id": "ride-1", "driver_id": "driver-1"}]
+        fake_drivers = [{"id": "driver-1", "first_name": "Test", "last_name": "Driver"}]
+
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            # First is profile, second is bookings, third is in_ for rides, fourth is in_ for drivers
+            mock_sb_execute = MagicMock()
+            mock_sb_execute.execute.side_effect = [
+                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),
+                MagicMock(data=fake_bookings),
+                MagicMock(data=fake_rides),
+                MagicMock(data=fake_drivers),
+            ]
+            
+            def fake_table(name):
+                tm = MagicMock()
+                if name in ("user_profiles", "bookings"):
+                    tm.select.return_value.eq.return_value = mock_sb_execute
+                    tm.select.return_value.in_.return_value = mock_sb_execute
+                elif name == "rides":
+                    tm.select.return_value.in_.return_value = mock_sb_execute
+                return tm
+            
+            mock_sb.table.side_effect = fake_table
+
+            response = client.get("/bookings/me")
+
+        assert response.status_code == 200
+        assert response.json()[0]["ride"]["driver"]["first_name"] == "Test"
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +331,15 @@ class TestConfirmPickup:
 
         assert response.status_code == 400
 
+    def test_confirm_fails_if_booking_missing(self, client):
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+            mock_sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+
+            response = client.post("/bookings/bookings/book-1/confirm-pickup", params={"pickup_code": "wrong"})
+
+        assert response.status_code == 404
+
 
 # ---------------------------------------------------------------------------
 # POST /bookings/rides/{ride_id}/complete
@@ -219,6 +358,15 @@ class TestCompleteRide:
 
         assert response.status_code == 200
         assert response.json()["message"] == "Ride marked as completed"
+
+    def test_complete_fails_if_not_your_ride(self, client):
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+            mock_sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+
+            response = client.post("/bookings/rides/ride-1/complete")
+
+        assert response.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -241,3 +389,12 @@ class TestEmergencyTrigger:
 
         assert response.status_code == 200
         assert "Emergency" in response.json()["message"]
+
+    def test_emergency_fails_if_ride_not_found(self, client):
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),
+                MagicMock(data=[]),         # ride missing
+            ]
+            response = client.post("/bookings/rides/ride-1/emergency")
+        assert response.status_code == 404

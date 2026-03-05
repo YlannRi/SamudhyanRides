@@ -21,11 +21,14 @@ from main import app
 from app.accounts.dependencies import get_current_user
 from datetime import date
 from pydantic import ValidationError
+from postgrest.exceptions import APIError
 
 from app.routers.drivers import (
     validate_licence,
     validate_vehicle_reg,
-    _infer_full_year
+    _infer_full_year,
+    _is_missing_column_error,
+    safe_update
 )
 
 FAKE_USER = {"sub": "user-abc-123", "email": "passenger@bath.ac.uk"}
@@ -49,6 +52,8 @@ class TestValidationLogic:
         assert _infer_full_year(2) == 2002
         # A 85 birth year should be 1985.
         assert _infer_full_year(85) == 1985
+        # Fallback when no age is between 17 and 100 (e.g. 10 -> 2010=age 16, 1910=age 116)
+        assert _infer_full_year(10) == 1910
 
     def test_validate_licence_male(self):
         # DOB: 1985-05-15, Male
@@ -75,9 +80,23 @@ class TestValidationLogic:
         with pytest.raises(ValueError, match="Surname section invalid"):
             validate_licence("SMI**8051559A9A9")
 
+    def test_validate_licence_invalid_names(self):
+        with pytest.raises(ValueError, match="Last 5 chars must be alphanumeric"):
+            validate_licence("SMITH805155**9A9")
+
     def test_validate_licence_invalid_date_format(self):
         with pytest.raises(ValueError, match="Date section must be 6 digits"):
             validate_licence("SMITHXXXXXX9A9A9")
+
+    def test_validate_licence_invalid_date_logic(self):
+        # Feb 30th (month=02, day=30)
+        with pytest.raises(ValueError, match="Invalid date of birth in licence number"):
+            validate_licence("SMITH8023059A9A9")
+
+    def test_validate_licence_general_exception(self):
+        with patch("app.routers.drivers.date", side_effect=Exception("General Error")):
+            with pytest.raises(ValueError, match="Invalid date of birth in licence number"):
+                validate_licence("SMITH8051559A9A9")
 
     def test_validate_licence_too_young(self):
         # We must mock _infer_full_year to force it to return a recent year (e.g., 8 years ago)
@@ -96,6 +115,30 @@ class TestValidationLogic:
         assert validate_vehicle_reg("AB12 CDE") == "AB12CDE"
         with pytest.raises(ValueError, match="Invalid UK plate"):
             validate_vehicle_reg("INVALID123")
+
+    def test_is_missing_column_error(self):
+        assert _is_missing_column_error(Exception({"code": "PGRST204"})) is True
+        assert _is_missing_column_error(Exception("PGRST204 found in string value")) is True
+        assert _is_missing_column_error(Exception("Random string with PGRST204 code")) is True
+        assert _is_missing_column_error(Exception("Other error")) is False
+        
+        # Test the except block by causing an exception inside the try block
+        class WeirdException(Exception):
+            @property
+            def args(self):
+                raise ValueError("Boom")
+        assert _is_missing_column_error(WeirdException()) is False
+
+    def test_safe_update(self):
+        with patch("app.routers.drivers.supabase") as mock_sb:
+            mock_sb.table.return_value.update.return_value.eq.return_value.execute.side_effect = Exception({"code": "PGRST204"})
+            # Should suppress error
+            safe_update("table", "1", {"col": "v"})
+            
+            mock_sb.table.return_value.update.return_value.eq.return_value.execute.side_effect = Exception("Normal Error")
+            # Should re-raise
+            with pytest.raises(Exception, match="Normal Error"):
+                safe_update("table", "1", {"col": "v"})
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +227,51 @@ class TestUpgradeDriver:
         assert response.status_code == 200
         assert "verification submitted" in response.json()["message"]
 
+    def test_upgrade_driver_existing_request(self, client):
+        with patch("app.routers.drivers.supabase") as mock_sb, \
+             patch("app.routers.drivers.get_profile_id", return_value=FAKE_PROFILE_ID):
+             
+            def fake_table(name):
+                t_mock = MagicMock()
+                if name == "user_profiles":
+                    t_mock.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+                elif name == "driver_verification":
+                    # Returns existing id
+                    t_mock.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = [{"id": "exist-1"}]
+                    # updating throws an API error handled silently by safe_update
+                    t_mock.update.return_value.eq.return_value.execute.return_value = None
+                return t_mock
+
+            mock_sb.table.side_effect = fake_table
+
+            response = client.post("/drivers/upgrade", json={
+                "licence_number": "SMITH8051559A9A9",
+                "vehicle_registration": "AB12CDE"
+            })
+
+        assert response.status_code == 200
+        assert "verification submitted" in response.json()["message"]
+
+    def test_upgrade_driver_safe_update_throws_other_error(self, client):
+        with patch("app.routers.drivers.supabase") as mock_sb, \
+             patch("app.routers.drivers.get_profile_id", return_value=FAKE_PROFILE_ID), \
+             patch("app.routers.drivers.safe_update", side_effect=APIError({"code": "OTHER_ERR"})):
+            
+            def fake_table(name):
+                t_mock = MagicMock()
+                if name == "driver_verification":
+                    t_mock.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = []
+                    t_mock.insert.return_value.execute.return_value.data = [{"id": "verif-1"}]
+                return t_mock
+
+            mock_sb.table.side_effect = fake_table
+
+            with pytest.raises(APIError):
+                client.post("/drivers/upgrade", json={
+                    "licence_number": "SMITH8051559A9A9",
+                    "vehicle_registration": "AB12CDE"
+                })
+
     def test_upgrade_fails_invalid_payload(self, client):
         with patch("app.routers.drivers.get_profile_id", return_value=FAKE_PROFILE_ID):
             response = client.post("/drivers/upgrade", json={
@@ -254,6 +342,12 @@ class TestGetDriverInfo:
 
         assert response.status_code == 404
 
+    def test_get_all_drivers_empty(self, client):
+        with patch("app.routers.drivers.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+            response = client.get("/drivers/")
+        assert response.status_code == 404
+
     def test_get_all_drivers(self, client):
         with patch("app.routers.drivers.supabase") as mock_sb:
             def fake_table(name):
@@ -271,6 +365,12 @@ class TestGetDriverInfo:
         assert response.status_code == 200
         assert response.json()[0]["first_name"] == "Tom"
 
+    def test_get_verification_requests_empty(self, client):
+        with patch("app.routers.drivers.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+            response = client.get("/drivers/verification-requests")
+        assert response.status_code == 404
+
     def test_get_verification_requests(self, client):
         with patch("app.routers.drivers.supabase") as mock_sb:
             mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": "req-1"}]
@@ -278,6 +378,28 @@ class TestGetDriverInfo:
 
         assert response.status_code == 200
         assert response.json()[0]["id"] == "req-1"
+
+    def test_get_driver_not_verified(self, client):
+        with patch("app.routers.drivers.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+            response = client.get("/drivers/drv-1")
+        assert response.status_code == 404
+        assert "Driver not verified" in response.json()["detail"]
+
+    def test_get_driver_profile_not_found(self, client):
+        with patch("app.routers.drivers.supabase") as mock_sb:
+            def fake_table(name):
+                t_mock = MagicMock()
+                if name == "driver_verification":
+                    t_mock.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [{"driver_id": "drv-1"}]
+                elif name == "user_profiles":
+                    t_mock.select.return_value.eq.return_value.execute.return_value.data = []
+                return t_mock
+            mock_sb.table.side_effect = fake_table
+
+            response = client.get("/drivers/drv-1")
+        assert response.status_code == 404
+        assert "Driver profile not found" in response.json()["detail"]
 
     def test_get_driver(self, client):
         with patch("app.routers.drivers.supabase") as mock_sb:
@@ -295,6 +417,12 @@ class TestGetDriverInfo:
 
         assert response.status_code == 200
         assert response.json()["id"] == "drv-1"
+
+    def test_verify_driver_not_found(self, client):
+        with patch("app.routers.drivers.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+            response = client.post("/drivers/verify/verif-1")
+        assert response.status_code == 404
 
     def test_verify_driver(self, client):
         with patch("app.routers.drivers.supabase") as mock_sb:
