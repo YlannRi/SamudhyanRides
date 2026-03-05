@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { apiFetch } from "./lib/api";
+import { setAuthToken } from "./lib/authToken";
 
 type LoginPageProps = {
     onAuthSuccess?: () => void;
@@ -74,7 +75,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
 
             if (mode === 'login') {
                 if (data.access_token || data.token) {
-                    localStorage.setItem('authToken', data.access_token || data.token);
+                    setAuthToken(data.access_token || data.token);
                     if (onAuthSuccess) onAuthSuccess();
                 } else {
                     throw new Error('Invalid login credentials.');
@@ -114,8 +115,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                         const token = loginRes?.access_token || loginRes?.token;
                         if (!token) throw new Error('Auto-login failed: missing token');
 
-                        localStorage.setItem('authToken', token);
-
+                        setAuthToken(token);
                         setSuccessMessage('Account created! Complete driver signup.');
                         onStartDriverSignup?.(draft);
                         return;

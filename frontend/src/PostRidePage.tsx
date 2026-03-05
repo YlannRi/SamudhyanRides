@@ -108,8 +108,9 @@ const PostRidePage: React.FC = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="auth-field">
-            <label className="auth-label">Start Location</label>
+            <label className="auth-label" htmlFor="post-ride-origin">Start Location</label>
             <input
+              id="post-ride-origin"
               type="text"
               className="auth-input"
               placeholder="e.g. Lower Oldfield Park"
@@ -120,8 +121,9 @@ const PostRidePage: React.FC = () => {
           </div>
 
           <div className="auth-field">
-            <label className="auth-label">Destination</label>
+            <label className="auth-label" htmlFor="post-ride-destination">Destination</label>
             <input
+              id="post-ride-destination"
               type="text"
               className="auth-input"
               placeholder="e.g. University of Bath"
@@ -132,8 +134,9 @@ const PostRidePage: React.FC = () => {
           </div>
 
           <div className="auth-field">
-            <label className="auth-label">Destination arrival Date and Time</label>
+            <label className="auth-label" htmlFor="post-ride-arrival">Destination arrival Date and Time</label>
             <input
+              id="post-ride-arrival"
               type="datetime-local"
               className="auth-input"
               value={timeInput}
@@ -144,8 +147,9 @@ const PostRidePage: React.FC = () => {
 
           <div style={{ display: 'flex', gap: '12px' }}>
             <div className="auth-field" style={{ flex: 1 }}>
-              <label className="auth-label">Price (£)</label>
+              <label className="auth-label" htmlFor="post-ride-price">Price (£)</label>
               <input
+                id="post-ride-price"
                 type="number"
                 step="0.10"
                 min="0"
@@ -158,8 +162,9 @@ const PostRidePage: React.FC = () => {
             </div>
 
             <div className="auth-field" style={{ width: '100px' }}>
-              <label className="auth-label">Seats</label>
+              <label className="auth-label" htmlFor="post-ride-seats">Seats</label>
               <input
+                id="post-ride-seats"
                 type="number"
                 min="1"
                 max="8"

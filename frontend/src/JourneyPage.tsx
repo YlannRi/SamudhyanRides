@@ -13,7 +13,7 @@ const UserJourney: React.FC<{ trips: any[] }> = ({ trips }) => {
     return (
       <div className="journey-content" style={{ alignItems: 'center', marginTop: '60px', color: 'var(--text-secondary)' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
-        <h3>No Active Journeys</h3>
+        <h2 style={{ fontSize: '1.17em', margin: 0, fontWeight: 700 }}>No Active Journeys</h2>
         <p>You don't have any rides currently in progress.</p>
       </div>
     );
@@ -98,7 +98,7 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
     return (
       <div className="journey-content" style={{ alignItems: 'center', marginTop: '60px', color: 'var(--text-secondary)' }}>
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚗</div>
-        <h3>No Active Drives</h3>
+        <h2 style={{ fontSize: '1.17em', margin: 0, fontWeight: 700 }}>No Active Drives</h2>
         <p>You are not currently driving any active routes.</p>
       </div>
     );

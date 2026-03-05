@@ -84,7 +84,14 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
   return (
     <div style={{ paddingTop: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 14px' }}>
-        <button className="sheet-action-btn btn-message" style={{ width: 44, height: 44, padding: 0 }} onClick={onBack}>
+        <button
+          type="button"
+          className="sheet-action-btn btn-message"
+          style={{ width: 44, height: 44, padding: 0 }}
+          onClick={onBack}
+          aria-label="Back"
+          title="Back"
+        >
           {BackIcon}
         </button>
         <div style={{ fontSize: 18, fontWeight: 800 }}>Settings</div>
