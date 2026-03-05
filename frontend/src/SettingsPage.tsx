@@ -47,9 +47,6 @@ function prettyLabel(key: string) {
 function toDisplayValue(v: any): React.ReactNode {
   // shows up but as "not provided" when NULL in the database
   if (v === null || v === undefined) return 'Not provided';
-  // if (key === 'verified') {
-  //   return v ? 'Verified' : 'Pending verification'
-  // }
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
   if (typeof v === 'object') return JSON.stringify(v);
   return String(v);
