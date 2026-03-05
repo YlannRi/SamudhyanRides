@@ -44,7 +44,7 @@ function prettyLabel(key: string) {
     .replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
-function toDisplayValue(v: any, key?: string): React.ReactNode {
+function toDisplayValue(v: any): React.ReactNode {
   // shows up but as "not provided" when NULL in the database
   if (v === null || v === undefined) return 'Not provided';
   // if (key === 'verified') {
