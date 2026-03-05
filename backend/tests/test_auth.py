@@ -155,7 +155,7 @@ class TestRegisterSuccess:
 
 class TestLogin:
 
-    def test_successful_login(self, client):
+    def test_successful_login_with_email(self, client):
         mock_user = MagicMock()
         mock_session = MagicMock()
         mock_session.access_token = "fake-access-token"
@@ -165,11 +165,13 @@ class TestLogin:
         mock_response.user = mock_user
         mock_response.session = mock_session
 
-        with patch("app.routers.auth.supabase") as mock_supabase:
-            mock_supabase.auth.sign_in_with_password.return_value = mock_response
+        with patch("app.routers.auth.supabase") as mock_sb:
+            # Username lookup returns nothing → treat identifier as email directly
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+            mock_sb.auth.sign_in_with_password.return_value = mock_response
 
             response = client.post("/auth/login", json={
-                "email": "user@bath.ac.uk",
+                "identifier": "user@bath.ac.uk",
                 "password": "Password1!"
             })
 
@@ -179,13 +181,38 @@ class TestLogin:
         assert data["refresh_token"] == "fake-refresh-token"
         assert data["token_type"] == "bearer"
 
-    def test_login_invalid_credentials(self, client):
-        """Supabase raises an exception on bad credentials."""
-        with patch("app.routers.auth.supabase") as mock_supabase:
-            mock_supabase.auth.sign_in_with_password.side_effect = Exception("Invalid login credentials")
+    def test_successful_login_with_university_username(self, client):
+        """If identifier matches a university username, it's resolved to the email."""
+        mock_user = MagicMock()
+        mock_session = MagicMock()
+        mock_session.access_token = "fake-access-token"
+        mock_session.refresh_token = "fake-refresh-token"
+
+        mock_response = MagicMock()
+        mock_response.user = mock_user
+        mock_response.session = mock_session
+
+        with patch("app.routers.auth.supabase") as mock_sb:
+            # Username lookup finds a matching email
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+                {"email": "jd123@bath.ac.uk"}
+            ]
+            mock_sb.auth.sign_in_with_password.return_value = mock_response
 
             response = client.post("/auth/login", json={
-                "email": "user@bath.ac.uk",
+                "identifier": "jd123",
+                "password": "Password1!"
+            })
+
+        assert response.status_code == 200
+
+    def test_login_invalid_credentials(self, client):
+        with patch("app.routers.auth.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+            mock_sb.auth.sign_in_with_password.side_effect = Exception("Invalid login credentials")
+
+            response = client.post("/auth/login", json={
+                "identifier": "user@bath.ac.uk",
                 "password": "wrongpassword"
             })
 
