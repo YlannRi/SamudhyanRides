@@ -213,7 +213,7 @@ describe('DriverSignupPage Component', () => {
   describe('Debounced Server Validation', () => {
     it('calls the validation API and sets server errors after typing license number', async () => {
       vi.useFakeTimers();
-      (apiFetch as vi.Mock).mockResolvedValueOnce({
+            vi.mocked(apiFetch).mockResolvedValueOnce({
         field_errors: { licence_number: 'License not found in server' }
       });
 
@@ -250,7 +250,7 @@ describe('DriverSignupPage Component', () => {
     });
 
     it('handles server errors returning specific field issues during submission', async () => {
-      (apiFetch as vi.Mock).mockRejectedValueOnce({
+      vi.mocked(apiFetch).mockRejectedValueOnce({
         detail: { field_errors: { vehicle_registration: 'Plate already registered' } }
       });
 
@@ -267,7 +267,7 @@ describe('DriverSignupPage Component', () => {
     });
 
     it('handles general server errors during submission', async () => {
-      (apiFetch as vi.Mock).mockRejectedValueOnce({
+      vi.mocked(apiFetch).mockRejectedValueOnce({
         message: 'Internal Server Error. Please try again later.'
       });
 
@@ -283,7 +283,7 @@ describe('DriverSignupPage Component', () => {
     });
 
     it('handles submission empty fallback errors lacking a message payload', async () => {
-      (apiFetch as vi.Mock).mockRejectedValueOnce({});
+      vi.mocked(apiFetch).mockRejectedValueOnce({});
 
       render(<DriverSignupPage {...mockProps} />);
       fillValidForm();
