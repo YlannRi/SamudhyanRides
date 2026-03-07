@@ -83,8 +83,8 @@ type FieldKey =
 const Section: React.FC<{ title: string; subtitle?: string; children: React.ReactNode }> = ({ title, subtitle, children }) => (
   <div style={{ padding: '14px 0', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
     <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: '#f9fafb' }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>{subtitle}</div>}
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</div>
+      {subtitle && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{subtitle}</div>}
     </div>
     {children}
   </div>
@@ -127,7 +127,7 @@ const Field: React.FC<{
         aria-describedby={describedBy}
       />
       {hint && !error && (
-        <div id={hintId} style={{ marginTop: 6, color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>
+        <div id={hintId} style={{ marginTop: 6, color: 'var(--text-secondary)', fontSize: 12 }}>
           {hint}
         </div>
       )}
@@ -172,7 +172,7 @@ const FileField: React.FC<{
         aria-describedby={describedBy}
       />
       {hint && !error && (
-        <div id={hintId} style={{ marginTop: 6, color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>
+        <div id={hintId} style={{ marginTop: 6, color: 'var(--text-secondary)', fontSize: 12 }}>
           {hint}
         </div>
       )}

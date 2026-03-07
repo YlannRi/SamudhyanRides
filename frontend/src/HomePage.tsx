@@ -115,7 +115,7 @@ const HomePage: React.FC<HomePageProps> = ({
           }}
         >
           <span className="home-where-icon">●</span>
-          <span className="home-where-text">Where to?</span>
+          <span className="home-where-text">{mode === 'Driver' ? 'Post a ride' : 'Request a ride'}</span>
         </button>
 
         {/* Shortcuts */}

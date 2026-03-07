@@ -104,7 +104,8 @@ export const RideRenderMap: React.FC<RideRenderMapProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#e5e7eb',
+          backgroundColor: 'var(--bg-surface)',
+          color: 'var(--text-primary)',
           borderRadius: '8px',
         }}
       >

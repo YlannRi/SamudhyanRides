@@ -107,79 +107,78 @@ const PostRidePage: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit}>
-  <div className="auth-field">
-    <label className="auth-label" htmlFor="origin">Start Location</label>
-    <input
-      id="origin"
-      type="text"
-      className="auth-input"
-      placeholder="e.g. Lower Oldfield Park"
-      value={origin}
-      onChange={(e) => setOrigin(e.target.value)}
-      required
-    />
-  </div>
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="post-ride-origin">Start Location</label>
+            <input
+              id="post-ride-origin"
+              type="text"
+              className="auth-input"
+              placeholder="e.g. Lower Oldfield Park"
+              value={origin}
+              onChange={(e) => setOrigin(e.target.value)}
+              required
+            />
+          </div>
 
-  <div className="auth-field">
-    <label className="auth-label" htmlFor="destination">Destination</label>
-    <input
-      id="destination"
-      type="text"
-      className="auth-input"
-      placeholder="e.g. University of Bath"
-      value={destination}
-      onChange={(e) => setDestination(e.target.value)}
-      required
-    />
-  </div>
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="post-ride-destination">Destination</label>
+            <input
+              id="post-ride-destination"
+              type="text"
+              className="auth-input"
+              placeholder="e.g. University of Bath"
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              required
+            />
+          </div>
 
-  <div className="auth-field">
-    <label className="auth-label" htmlFor="timeInput">Destination arrival Date and Time</label>
-    <input
-      id="timeInput"
-      type="datetime-local"
-      className="auth-input"
-      value={timeInput}
-      onChange={(e) => setTimeInput(e.target.value)}
-      required
-    />
-  </div>
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="post-ride-arrival">Destination arrival Date and Time</label>
+            <input
+              id="post-ride-arrival"
+              type="datetime-local"
+              className="auth-input"
+              value={timeInput}
+              onChange={(e) => setTimeInput(e.target.value)}
+              required
+            />
+          </div>
 
-  <div style={{ display: 'flex', gap: '12px' }}>
-    <div className="auth-field" style={{ flex: 1 }}>
-      <label className="auth-label" htmlFor="price">Price (£)</label>
-      <input
-        id="price"
-        type="number"
-        step="0.10"
-        min="0"
-        className="auth-input"
-        placeholder="e.g. 5.50"
-        value={price}
-        onChange={(e) => setPrice(e.target.value)}
-        required
-      />
-    </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <div className="auth-field" style={{ flex: 1 }}>
+              <label className="auth-label" htmlFor="post-ride-price">Price (£)</label>
+              <input
+                id="post-ride-price"
+                type="number"
+                step="0.10"
+                min="0"
+                className="auth-input"
+                placeholder="e.g. 5.50"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                required
+              />
+            </div>
 
-    <div className="auth-field" style={{ width: '100px' }}>
-      <label className="auth-label" htmlFor="seats">Seats</label>
-      <input
-        id="seats"
-        type="number"
-        min="1"
-        max="8"
-        className="auth-input"
-        value={seats}
-        onChange={(e) => setSeats(e.target.value)}
-        required
-      />
-    </div>
-  </div>
-
-  <button type="submit" className="auth-submit" disabled={loading} style={{ marginTop: '12px' }}>
-    {loading ? 'Posting...' : 'Post Ride'}
-  </button>
-</form>
+            <div className="auth-field" style={{ width: '100px' }}>
+              <label className="auth-label" htmlFor="post-ride-seats">Seats</label>
+              <input
+                id="post-ride-seats"
+                type="number"
+                min="1"
+                max="8"
+                className="auth-input"
+                value={seats}
+                onChange={(e) => setSeats(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <button type="submit" className="auth-submit" disabled={loading} style={{ marginTop: '12px' }}>
+            {loading ? 'Posting...' : 'Post Ride'}
+          </button>
+        </form>
       </div>
     </div>
   );

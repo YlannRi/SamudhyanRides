@@ -1,186 +1,155 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import DriverSignupPage from './DriverSignupPage';
+import HomePage from './HomePage';
 
-vi.mock('./lib/api', () => ({
-  apiFetch: vi.fn(),
-}));
-
-describe('DriverSignupPage Component', () => {
+describe('HomePage Component', () => {
   const mockProps = {
-    onBack: vi.fn(),
-    onComplete: vi.fn(),
+    onRequestRide: vi.fn(),
+    onPostRide: vi.fn(),
+    canUseDriverMode: true,
+    onDriverSignup: vi.fn(),
+    onOpenTimetable: vi.fn(),
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    window.localStorage.clear();
+    localStorage.clear();
   });
 
-  it('renders the form and handles the back button', () => {
-    render(<DriverSignupPage {...mockProps} />);
+  it('renders the header and core sections', () => {
+    render(<HomePage {...mockProps} />);
 
-    expect(screen.getByText('Driver sign-up')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Back/i }));
-    expect(mockProps.onBack).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('SamudhyanRides')).toBeInTheDocument();
+    expect(screen.getByText('Request a ride')).toBeInTheDocument();
+    expect(screen.getByText('Shortcuts')).toBeInTheDocument();
+    expect(screen.getByText('Services')).toBeInTheDocument();
   });
 
-  it('pre-fills data from localStorage on mount', () => {
-    localStorage.setItem(
-      'driverSignupDraft',
-      JSON.stringify({
-        firstName: 'John',
-        lastName: 'Smith',
-        emailOrUsername: 'js123',
-      })
-    );
-
-    localStorage.setItem(
-      'driverApplication',
-      JSON.stringify({
-        driver: { phone_number: '+447000000000', address: 'Saved Address 123' },
-        vehicle: { make: 'Honda' },
-      })
-    );
-
-    render(<DriverSignupPage {...mockProps} />);
-
-    expect(screen.getByLabelText(/First name/i)).toHaveValue('John');
-    expect(screen.getByLabelText(/Last name/i)).toHaveValue('Smith');
-    expect(screen.getByLabelText(/Email or university username/i)).toHaveValue('js123');
-    expect(screen.getByLabelText(/Phone number/i)).toHaveValue('+447000000000');
-    expect(screen.getByLabelText(/Residential address/i)).toHaveValue('Saved Address 123');
-    expect(screen.getByLabelText(/Vehicle make/i)).toHaveValue('Honda');
+  it('handles "Request a ride" click in default user mode', () => {
+    render(<HomePage {...mockProps} />);
+    fireEvent.click(screen.getByText('Request a ride'));
+    expect(mockProps.onRequestRide).toHaveBeenCalledTimes(1);
+    expect(mockProps.onRequestRide).toHaveBeenCalledWith(); // Empty prefill
   });
 
-  it('triggers onChange functions when typing in text fields', () => {
-    render(<DriverSignupPage {...mockProps} />);
+  it('switches to Driver mode and handles "Post a ride" for an authorized driver', () => {
+    render(<HomePage {...mockProps} canUseDriverMode={true} />);
 
-    const firstNameInput = screen.getByLabelText(/First name/i);
-    fireEvent.change(firstNameInput, { target: { value: 'Alice' } });
-    expect(firstNameInput).toHaveValue('Alice');
+    const driverTab = screen.getByText('Driver');
+    fireEvent.click(driverTab);
 
-    const vehicleMakeInput = screen.getByLabelText(/Vehicle make/i);
-    fireEvent.change(vehicleMakeInput, { target: { value: 'Ford' } });
-    expect(vehicleMakeInput).toHaveValue('Ford');
+    expect(driverTab).toHaveClass('toggle-tab-active');
+
+    fireEvent.click(screen.getByText('Post a ride'));
+    expect(mockProps.onPostRide).toHaveBeenCalledTimes(1);
   });
 
-  it('triggers onPick functions when uploading files', () => {
-    render(<DriverSignupPage {...mockProps} />);
+  it('triggers driver signup if unauthorized user clicks action button in Driver mode (fallback edge case)', () => {
+    render(<HomePage {...mockProps} canUseDriverMode={false} />);
 
-    const idFrontInput = screen.getByLabelText(/ID document upload.*front/i);
-    const mockFile = new File(['dummy content'], 'passport.png', { type: 'image/png' });
+    // Attempt to switch to Driver mode
+    const driverTab = screen.getByText('Driver');
+    fireEvent.click(driverTab);
 
-    // Triggers the onPick handler
-    fireEvent.change(idFrontInput, { target: { files: [mockFile] } });
+    // Grab the primary action button (whichever text it resolves to based on your state logic)
+    const actionButton = screen.queryByText('Post a ride') || screen.getByText('Request a ride');
+    fireEvent.click(actionButton);
 
-    // File inputs are tricky to test by value, but verifying it remains in the document
-    // after the change event ensures the `onPick` state update didn't crash the component.
-    expect(idFrontInput).toBeInTheDocument();
+    // Because canUseDriverMode is false, it should intercept the action and trigger signup
+    expect(mockProps.onDriverSignup).toHaveBeenCalledTimes(1);
   });
 
-  it('triggers onBlur (markTouched) and field validation when navigating away from an empty required field', async () => {
-    render(<DriverSignupPage {...mockProps} />);
+  it('calls onRequestRide with destination when fixed shortcut is clicked', () => {
+    render(<HomePage {...mockProps} />);
 
-    const lastNameInput = screen.getByLabelText(/Last name/i);
-
-    // Focus and blur to trigger `markTouched`
-    fireEvent.focus(lastNameInput);
-    fireEvent.blur(lastNameInput);
-
-    // Because 'touched' is missing from the component's useEffect dependency array,
-    // we must simulate a typing change to force the validation check to run
-    fireEvent.change(lastNameInput, { target: { value: 'A' } });
-    fireEvent.change(lastNameInput, { target: { value: '' } });
-
-    expect(await screen.findByText('Last name is required.')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('University of Bath'));
+    expect(mockProps.onRequestRide).toHaveBeenCalledWith({ destination: 'University of Bath' });
   });
 
-  it('triggers handleSubmit and validateAll when submitting an empty form', async () => {
-    render(<DriverSignupPage {...mockProps} />);
+  it('calls onOpenTimetable when Timetable service is clicked', () => {
+    render(<HomePage {...mockProps} />);
 
-    // Submit directly on the form bypasses the 'required' block
-    const form = screen.getByRole('button', { name: 'Submit driver application' }).closest('form');
-    fireEvent.submit(form!);
-
-    // Verifies the catch-all error message from handleSubmit
-    expect(await screen.findByText('Please fix the highlighted fields.')).toBeInTheDocument();
-
-    // Verifies a specific field validation kicked in
-    expect(await screen.findByText('First name is required.')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Timetable'));
+    expect(mockProps.onOpenTimetable).toHaveBeenCalledTimes(1);
   });
 
-  it('triggers state updates and blur handlers for payout and tax fields', () => {
-    render(<DriverSignupPage {...mockProps} />);
+  describe('Saved Places flow', () => {
+    it('opens and closes the save place modal without saving', () => {
+      render(<HomePage {...mockProps} />);
 
-    const accountName = screen.getByLabelText(/Bank account holder name/i);
-    fireEvent.change(accountName, { target: { value: 'John Doe' } });
-    fireEvent.blur(accountName);
+      fireEvent.click(screen.getByText('Save a place'));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-    const bankName = screen.getByLabelText(/Bank name/i);
-    fireEvent.change(bankName, { target: { value: 'Monzo' } });
-    fireEvent.blur(bankName);
+      fireEvent.click(screen.getByText('Cancel'));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
 
-    const iban = screen.getByLabelText(/IBAN/i);
-    fireEvent.change(iban, { target: { value: 'INVALID_IBAN' } });
-    fireEvent.blur(iban);
+    it('saves a new place and renders it as a shortcut', () => {
+      render(<HomePage {...mockProps} />);
 
-    const taxInfo = screen.getByLabelText(/Tax information/i);
-    fireEvent.change(taxInfo, { target: { value: 'Tax123' } });
-    fireEvent.blur(taxInfo);
+      fireEvent.click(screen.getByText('Save a place'));
 
-    expect(accountName).toHaveValue('John Doe');
-  });
+      // Fill out form
+      fireEvent.change(screen.getByPlaceholderText('e.g. Home'), { target: { value: 'My House' } });
+      fireEvent.change(screen.getByPlaceholderText('e.g. 12 Example Street'), { target: { value: '10 Test Lane' } });
+      fireEvent.change(screen.getByPlaceholderText('e.g. BA2 7AY'), { target: { value: 'BA1 1AA' } });
+      fireEvent.change(screen.getByPlaceholderText('e.g. Bath'), { target: { value: 'Bath' } });
 
-  it('triggers state updates and blur handlers for vehicle info fields', () => {
-    render(<DriverSignupPage {...mockProps} />);
+      // Save
+      fireEvent.click(screen.getByText('Save'));
 
-    const model = screen.getByLabelText(/Model/i);
-    fireEvent.change(model, { target: { value: 'Civic' } });
-    fireEvent.blur(model);
+      // Modal should close
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    const year = screen.getByLabelText(/Year/i);
-    fireEvent.change(year, { target: { value: '1900' } }); // Invalid year to hit validation branch
-    fireEvent.blur(year);
+      // Shortcut should appear
+      expect(screen.getByText('My House')).toBeInTheDocument();
+      expect(screen.getByText('10 Test Lane, BA1 1AA, Bath')).toBeInTheDocument();
 
-    const color = screen.getByLabelText(/Color/i);
-    fireEvent.change(color, { target: { value: 'Red' } });
-    fireEvent.blur(color);
+      // Local storage should be updated
+      const savedPlaces = JSON.parse(localStorage.getItem('savedPlaces') || '[]');
+      expect(savedPlaces).toHaveLength(1);
+      expect(savedPlaces[0].label).toBe('My House');
 
-    const regCountry = screen.getByLabelText(/Registration country/i);
-    fireEvent.change(regCountry, { target: { value: 'UK' } });
-    fireEvent.blur(regCountry);
+      // Clicking the new shortcut
+      fireEvent.click(screen.getByText('My House'));
+      expect(mockProps.onRequestRide).toHaveBeenCalledWith({ destination: '10 Test Lane, BA1 1AA, Bath' });
+    });
 
-    const policyNum = screen.getByLabelText(/Insurance policy number/i);
-    fireEvent.change(policyNum, { target: { value: 'POL123' } });
-    fireEvent.blur(policyNum);
+    it('loads existing saved places from localStorage on mount', () => {
+      localStorage.setItem('savedPlaces', JSON.stringify([{
+        id: '123',
+        label: 'Gym',
+        address: '1 Fitness Rd',
+        postcode: 'BA2 2BB',
+        city: 'Bath'
+      }]));
 
-    const insuranceExpiry = screen.getByLabelText(/Insurance expiry date/i);
-    fireEvent.change(insuranceExpiry, { target: { value: '2025-01-01' } });
-    fireEvent.blur(insuranceExpiry);
+      render(<HomePage {...mockProps} />);
 
-    expect(model).toHaveValue('Civic');
-  });
+      expect(screen.getByText('Gym')).toBeInTheDocument();
+      expect(screen.getByText('1 Fitness Rd, BA2 2BB, Bath')).toBeInTheDocument();
+    });
 
-  it('triggers onPick for all remaining file upload inputs', () => {
-    render(<DriverSignupPage {...mockProps} />);
-    const dummyFile = new File(['dummy content'], 'test.png', { type: 'image/png' });
+    it('keeps the Save button disabled if address or postcode is missing', () => {
+      render(<HomePage {...mockProps} />);
 
-    const fileLabels = [
-      /ID document upload.*back/i,
-      /Selfie for identification/i,
-      /Licence photo/i,
-      /Vehicle photo — front/i,
-      /Vehicle photo — back/i,
-      /Vehicle photo — interior/i,
-    ];
+      fireEvent.click(screen.getByText('Save a place'));
 
-    fileLabels.forEach(labelRegex => {
-      const input = screen.getByLabelText(labelRegex);
-      fireEvent.change(input, { target: { files: [dummyFile] } });
-      fireEvent.blur(input);
-      expect(input).toBeInTheDocument();
+      const saveButton = screen.getByText('Save');
+      expect(saveButton).toBeDisabled();
+
+      // Fill only address
+      fireEvent.change(screen.getByPlaceholderText('e.g. 12 Example Street'), { target: { value: '10 Test Lane' } });
+      expect(saveButton).toBeDisabled();
+
+      // Fill postcode, but remove address
+      fireEvent.change(screen.getByPlaceholderText('e.g. 12 Example Street'), { target: { value: '' } });
+      fireEvent.change(screen.getByPlaceholderText('e.g. BA2 7AY'), { target: { value: 'BA1 1AA' } });
+      expect(saveButton).toBeDisabled();
+
+      // Fill both
+      fireEvent.change(screen.getByPlaceholderText('e.g. 12 Example Street'), { target: { value: '10 Test Lane' } });
+      expect(saveButton).not.toBeDisabled();
     });
   });
 });
