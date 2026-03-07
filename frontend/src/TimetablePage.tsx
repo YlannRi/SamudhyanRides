@@ -88,8 +88,11 @@ const TimetablePage: React.FC<Props> = ({ onBack, onSelectEvent }) => {
     <div style={{ width: '100%' }}>
       <header className="uber-header" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <button
+          type="button"
           onClick={onBack}
           style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: 20, padding: 0 }}
+          aria-label="Back"
+          title="Back"
         >
           ←
         </button>
@@ -98,8 +101,9 @@ const TimetablePage: React.FC<Props> = ({ onBack, onSelectEvent }) => {
 
       <div className="auth-card" style={{ marginBottom: 16 }}>
         <div className="auth-field">
-          <label className="auth-label">University timetable iCal URL</label>
+          <label className="auth-label" htmlFor="timetable-ical-url">University timetable iCal URL</label>
           <input
+            id="timetable-ical-url"
             className="auth-input"
             type="text"
             placeholder="https://mytimetable.bath.ac.uk/ical?..."

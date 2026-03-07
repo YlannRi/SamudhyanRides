@@ -117,6 +117,7 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
       <div style={{ width: '100%' }}>
         <header className="uber-header" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
+            type="button"
             onClick={() => {
               setSelectedRide(null);
               setPickupCoords(null);
@@ -124,6 +125,8 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
               setBookingSuccess(false);
             }}
             style={{ background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '20px', padding: 0 }}
+            aria-label="Back"
+            title="Back"
           >
             ←
           </button>
@@ -187,8 +190,9 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
 
       <div className="auth-card" style={{ marginBottom: '24px' }}>
         <div className="auth-field">
-          <label className="auth-label">Pick-up area (optional)</label>
+          <label className="auth-label" htmlFor="request-ride-origin">Pick-up area (optional)</label>
           <input
+            id="request-ride-origin"
             type="text"
             className="auth-input"
             placeholder="e.g. Oldfield Park"
@@ -198,8 +202,9 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
         </div>
 
         <div className="auth-field">
-          <label className="auth-label">Destination</label>
+          <label className="auth-label" htmlFor="request-ride-destination">Destination</label>
           <input
+            id="request-ride-destination"
             type="text"
             className="auth-input"
             placeholder="e.g. University of Bath"
@@ -209,8 +214,9 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
         </div>
 
         <div className="auth-field">
-          <label className="auth-label">Time of arrival (optional)</label>
+          <label className="auth-label" htmlFor="request-ride-arrival">Time of arrival (optional)</label>
           <input
+            id="request-ride-arrival"
             type="datetime-local"
             className="auth-input"
             value={timeInput}
