@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './App.css';
 import HomePage from './HomePage';
 import AccountPage from './AccountPage';
@@ -12,8 +12,44 @@ import SettingsPage from './SettingsPage';
 import { apiFetch } from './lib/api';
 import TimetablePage, { type RidePrefill } from './TimetablePage';
 import SafetyCheckupPage from './SafetyCheckupPage.tsx';
+import { getAuthToken, clearAuthToken } from './lib/authToken';
 
 type Tab = 'home' | 'journey' | 'activity' | 'account' | 'settings' | 'request' | 'post' | 'timetable' | 'safety';
+
+const pathToTab = (path: string): Tab => {
+  if (path.startsWith('/account')) return 'account';
+  if (path.startsWith('/activity')) return 'activity';
+  if (path.startsWith('/post-ride')) return 'post';
+  if (path.startsWith('/request-ride')) return 'request';
+  if (path.startsWith('/timetable')) return 'timetable';
+  if (path.startsWith('/journey')) return 'journey';
+  if (path.startsWith('/settings')) return 'settings';
+  if (path.startsWith('/safety')) return 'safety';
+  return 'home';
+};
+
+const tabToPath = (tab: Tab): string => {
+  switch (tab) {
+    case 'account':
+      return '/account';
+    case 'activity':
+      return '/activity';
+    case 'post':
+      return '/post-ride';
+    case 'request':
+      return '/request-ride';
+    case 'timetable':
+      return '/timetable';
+    case 'journey':
+      return '/journey';
+    case 'settings':
+      return '/settings';
+    case 'safety':
+      return '/safety';
+    default:
+      return '/';
+  }
+};
 
 export const MapPlaceholder: React.FC<{ label?: string }> = ({ label = 'Map Preview' }) => (
   <div className="map-placeholder">
@@ -147,10 +183,26 @@ export const Btn: React.FC<{ cls: string; icon: React.ReactNode; label: string; 
 );
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<Tab>('home');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>(() => pathToTab(window.location.pathname));
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return Boolean(getAuthToken());
+  });
   const [authScreen, setAuthScreen] = useState<'login' | 'driverSignup'>('login');
   const [requestRidePrefill, setRequestRidePrefill] = useState<RidePrefill | undefined>(undefined);
+
+  const navigate = (tab: Tab) => {
+    const nextPath = tabToPath(tab);
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, '', nextPath);
+    }
+    setActiveTab(tab);
+  };
+
+  useEffect(() => {
+    const onPopState = () => setActiveTab(pathToTab(window.location.pathname));
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   // Driver-gating
   const [canUseDriverMode, setCanUseDriverMode] = useState<boolean>(false);
@@ -169,6 +221,24 @@ const App: React.FC = () => {
       return false;
     }
   };
+  useEffect(() => {
+  const token = getAuthToken();
+    if (!token) return;
+    setIsAuthenticated(true);
+
+    (async () => {
+      try {
+        await apiFetch('users/me', { method: 'GET' });
+        await refreshDriverStatus();
+      } catch (e: any) {
+        if (e?.status === 401) {
+          clearAuthToken();
+          setIsAuthenticated(false);
+          setCanUseDriverMode(false);
+        }
+      }
+    })();
+  }, []);
 
   const handleAuthSuccess = async () => {
     setIsAuthenticated(true);
@@ -176,9 +246,9 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('authToken'); // Clear the token
+    clearAuthToken();
     setIsAuthenticated(false); // Reset auth state
-    setActiveTab('home'); // Reset tab so it defaults to home on next login
+    navigate('home'); // Reset tab so it defaults to home on next login
     setShowDriverSignup(false);
   };
 
@@ -190,7 +260,7 @@ const App: React.FC = () => {
   const goToDriverTab = async (destination: Tab) => {
     const ok = await refreshDriverStatus(); // always re-check server truth
     if (!ok) return startDriverSignup(destination);
-    setActiveTab(destination);
+    navigate(destination);
   };
 
   const renderAuthedContent = () => {
@@ -201,7 +271,7 @@ const App: React.FC = () => {
           onComplete={async () => {
             setShowDriverSignup(false);
             await refreshDriverStatus();
-            setActiveTab(afterDriverSignupTab);
+            navigate(afterDriverSignupTab);
           }}
         />
       );
@@ -213,12 +283,12 @@ const App: React.FC = () => {
           <HomePage
             onRequestRide={(prefill) => {
               setRequestRidePrefill(prefill);
-              setActiveTab('request');
+              navigate('request');
             }}
             onPostRide={() => void goToDriverTab('post')}
             canUseDriverMode={canUseDriverMode}
             onDriverSignup={() => startDriverSignup('post')}
-            onOpenTimetable={() => setActiveTab('timetable')}
+            onOpenTimetable={() => navigate('timetable')}
           />
         );
       case 'request':
@@ -246,16 +316,16 @@ const App: React.FC = () => {
                 return (
           <AccountPage
             onLogout={handleLogout}
-            onOpenSettings={() => setActiveTab('settings')}
-            onOpenTimetable={() => setActiveTab('timetable')}
-            onOpenSafetyCheckup={() => setActiveTab('safety')}
+            onOpenSettings={() => navigate('settings')}
+            onOpenTimetable={() => navigate('timetable')}
+            onOpenSafetyCheckup={() => navigate('safety')}
           />
         );
       case 'safety':
-        return <SafetyCheckupPage onBack={() => setActiveTab('account')} />;
+        return <SafetyCheckupPage onBack={() => navigate('account')} />;
 
       case 'settings':
-        return <SettingsPage onBack={() => setActiveTab('account')} />;
+        return <SettingsPage onBack={() => navigate('account')} />;
       case 'journey':
         return (
           <JourneyPage
@@ -273,21 +343,21 @@ const App: React.FC = () => {
       case 'timetable':
         return (
           <TimetablePage
-            onBack={() => setActiveTab('account')}
+            onBack={() => navigate('account')}
             onSelectEvent={(prefill) => {
               setRequestRidePrefill(prefill);
-              setActiveTab('request');
+              navigate('request');
             }}
           />
         );
       default:
         return (
           <HomePage
-            onRequestRide={() => setActiveTab('request')}
+            onRequestRide={() => navigate('request')}
             onPostRide={() => goToDriverTab('post')}
             canUseDriverMode={canUseDriverMode}
             onDriverSignup={() => startDriverSignup('post')}
-            onOpenTimetable={() => setActiveTab('timetable')}
+            onOpenTimetable={() => navigate('timetable')}
           />
         );
     }
@@ -298,6 +368,7 @@ const App: React.FC = () => {
       <a className="skip-link" href="#main-content">Skip to main content</a>
 
       <main id="main-content" className="uber-container" role="main" tabIndex={-1}>
+        <h1 className="visually-hidden">SamudhyanRides</h1>
         {isAuthenticated ? (
           renderAuthedContent()
         ) : authScreen === 'driverSignup' ? (
@@ -325,7 +396,7 @@ const App: React.FC = () => {
             type="button"
             aria-current={activeTab === 'home' ? 'page' : undefined}
             className={`nav-item ${activeTab === 'home' ? 'nav-item-active' : ''}`}
-            onClick={() => setActiveTab('home')}
+            onClick={() => navigate('home')}
           >
             <div className="nav-icon">🚗</div>
             <div className="nav-label">Home</div>
@@ -335,7 +406,7 @@ const App: React.FC = () => {
             type="button"
             aria-current={activeTab === 'journey' ? 'page' : undefined}
             className={`nav-item ${activeTab === 'journey' ? 'nav-item-active' : ''}`}
-            onClick={() => setActiveTab('journey')}
+            onClick={() => navigate('journey')}
           >
             <div className="nav-icon">🗺️</div>
             <div className="nav-label">Journey</div>
@@ -345,7 +416,7 @@ const App: React.FC = () => {
             type="button"
             aria-current={activeTab === 'activity' ? 'page' : undefined}
             className={`nav-item ${activeTab === 'activity' ? 'nav-item-active' : ''}`}
-            onClick={() => setActiveTab('activity')}
+            onClick={() => navigate('activity')}
           >
             <div className="nav-icon">🕒</div>
             <div className="nav-label">Activity</div>
@@ -355,7 +426,7 @@ const App: React.FC = () => {
             type="button"
             aria-current={activeTab === 'account' ? 'page' : undefined}
             className={`nav-item ${activeTab === 'account' ? 'nav-item-active' : ''}`}
-            onClick={() => setActiveTab('account')}
+            onClick={() => navigate('account')}
           >
             <div className="nav-icon">👤</div>
             <div className="nav-label">Account</div>

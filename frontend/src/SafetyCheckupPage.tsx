@@ -130,12 +130,15 @@ const SafetyCheckupPage: React.FC<SafetyCheckupPageProps> = ({ onBack }) => {
   const header = (title: string, backTo?: View) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 14px' }}>
       <button
+        type="button"
         className="sheet-action-btn btn-message"
         style={{ width: 44, height: 44, padding: 0 }}
         onClick={() => {
           if (backTo) setView(backTo);
           else onBack();
         }}
+        aria-label="Back"
+        title="Back"
       >
         {BackIcon}
       </button>

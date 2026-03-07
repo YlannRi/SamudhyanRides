@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { apiFetch } from "./lib/api";
+import { setAuthToken } from "./lib/authToken";
 
 type LoginPageProps = {
     onAuthSuccess?: () => void;
@@ -52,7 +53,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
 
         const payload =
             mode === 'login'
-                ? { email: emailOrUsername, password }
+                ? { identifier: emailOrUsername, password }
                 : {
                     email: emailOrUsername,
                     password,
@@ -74,7 +75,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
 
             if (mode === 'login') {
                 if (data.access_token || data.token) {
-                    localStorage.setItem('authToken', data.access_token || data.token);
+                    setAuthToken(data.access_token || data.token);
                     if (onAuthSuccess) onAuthSuccess();
                 } else {
                     throw new Error('Invalid login credentials.');
@@ -107,15 +108,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                         const loginRes = await apiFetch<any>('auth/login', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email, password: pw }),
+                            // Change this line to use 'identifier' instead of 'email'
+                            body: JSON.stringify({ identifier: email, password: pw }),
                             auth: false,
                         });
 
                         const token = loginRes?.access_token || loginRes?.token;
                         if (!token) throw new Error('Auto-login failed: missing token');
 
-                        localStorage.setItem('authToken', token);
-
+                        setAuthToken(token);
                         setSuccessMessage('Account created! Complete driver signup.');
                         onStartDriverSignup?.(draft);
                         return;
@@ -223,12 +224,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                     )}
 
                     <div className="auth-field">
-                        <label className="auth-label" htmlFor="email">Email or university username</label>
+                        <label className="auth-label" htmlFor="email">{mode === 'login' ? 'Email or university username' : 'Email'}</label>
                         <input
                             id="email"
                             type="text"
                             className="auth-input"
-                            placeholder="you@bath.ac.uk or abc123"
+                            placeholder={mode === 'login' ? 'you@bath.ac.uk or abc123' : 'you@bath.ac.uk'}
                             value={emailOrUsername}
                             onChange={(e) => setEmailOrUsername(e.target.value)}
                             required

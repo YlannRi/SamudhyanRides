@@ -7,6 +7,7 @@ type QuickActionCardProps = {
   hasDot?: boolean;
   onClick?: () => void;
   style?: CSSProperties;
+  iconColor?: string;
 };
 
 const QuickActionCard: React.FC<QuickActionCardProps> = ({
@@ -15,10 +16,13 @@ const QuickActionCard: React.FC<QuickActionCardProps> = ({
   hasDot = false,
   onClick,
   style,
+  iconColor,
 }) => (
   <button className="card quick-card" onClick={onClick} style={style}>
     <div className="card-icon small-icon">
-      <span className="icon-glyph">{emoji}</span>
+      <span className="icon-glyph" style={iconColor ? { color: iconColor } : undefined}>
+        {emoji}
+      </span>
     </div>
     <span className="quick-card-label">{label}</span>
     {hasDot && <span className="quick-card-dot" />}
@@ -165,7 +169,7 @@ const AccountPage: React.FC<AccountPageProps> = ({ onLogout, onOpenSettings, onO
         <QuickActionCard 
         emoji="⚠️" 
         label="Safety Alarm" 
-        style={{ color: '#ff5555' }} 
+        iconColor="#ff5555"
         onClick={() => setShowSafetyToolkit(true)} />
         <QuickActionCard emoji="✉" label="Inbox" hasDot />
       </div>

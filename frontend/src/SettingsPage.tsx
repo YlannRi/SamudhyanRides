@@ -20,6 +20,24 @@ const DetailRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label,
   </div>
 );
 
+// sets up which fields will be displayed to users
+const PROFILE_FIELDS = [
+    'first_name',
+    'last_name',
+    'email',
+    'university_username',
+    'rider_rating',
+    'phone_number',
+    'gender',
+]
+
+// sets up which fields will be shown to drivers
+const DRIVER_FIELDS = [
+    'verified',
+    'vehicle_registration',
+    'licence_number',
+]
+
 function prettyLabel(key: string) {
   return key
     .replace(/_/g, ' ')
@@ -27,7 +45,8 @@ function prettyLabel(key: string) {
 }
 
 function toDisplayValue(v: any): React.ReactNode {
-  if (v === null || v === undefined) return '';
+  // shows up but as "not provided" when NULL in the database
+  if (v === null || v === undefined) return 'Not provided';
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
   if (typeof v === 'object') return JSON.stringify(v);
   return String(v);
@@ -69,22 +88,29 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ onBack }) => {
 
   const profileRows = useMemo(() => {
     if (!profile) return [] as Array<{ k: string; v: any }>;
-    return Object.entries(profile)
-      .filter(([, v]) => v !== null && v !== undefined && v !== '')
-      .map(([k, v]) => ({ k, v }));
+    return PROFILE_FIELDS
+      // .filter((k) => profile[k] !== null && profile[k] !== undefined && profile[k] !== '')
+      .map((k) => ({ k, v: profile[k] }))
   }, [profile]);
 
   const driverRows = useMemo(() => {
     if (!driverProfile) return [] as Array<{ k: string; v: any }>;
-    return Object.entries(driverProfile)
-      .filter(([, v]) => v !== null && v !== undefined && v !== '')
-      .map(([k, v]) => ({ k, v }));
+    return DRIVER_FIELDS
+        // .filter((k) => driverProfile[k] !== null && driverProfile[k] !== undefined && driverProfile[k] !== '')
+        .map((k) => ({ k, v: driverProfile[k] }))
   }, [driverProfile]);
 
   return (
     <div style={{ paddingTop: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px 14px' }}>
-        <button className="sheet-action-btn btn-message" style={{ width: 44, height: 44, padding: 0 }} onClick={onBack}>
+        <button
+          type="button"
+          className="sheet-action-btn btn-message"
+          style={{ width: 44, height: 44, padding: 0 }}
+          onClick={onBack}
+          aria-label="Back"
+          title="Back"
+        >
           {BackIcon}
         </button>
         <div style={{ fontSize: 18, fontWeight: 800 }}>Settings</div>

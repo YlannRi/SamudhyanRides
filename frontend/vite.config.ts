@@ -1,18 +1,29 @@
+// vitest.config.ts (or vite.config.ts)
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
-import path from 'path' // Add this import
+import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    host: 'localhost',
+    port: 5173,
+    strictPort: true,
+  },
+  preview: {
+    host: 'localhost',
+    port: 5173,
+    strictPort: true,
+  },
   test: {
     environment: 'jsdom',
+    exclude: ['node_modules/**', 'dist/**', 'tests/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         'src/components/Map/**',
-        //'src/lib/**',
         'node_modules/**',
         'dist/**'
       ],
@@ -22,7 +33,6 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      // Force Vitest to use your project's single instance of React
       react: path.resolve(__dirname, './node_modules/react'),
       'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
     },
