@@ -103,6 +103,8 @@ describe('App Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    window.location.hash = '';
+    window.history.replaceState({}, '', '/');
   });
 
   describe('Exported Helper Components', () => {

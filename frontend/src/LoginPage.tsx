@@ -108,7 +108,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                         const loginRes = await apiFetch<any>('auth/login', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ email, password: pw }),
+                            // Change this line to use 'identifier' instead of 'email'
+                            body: JSON.stringify({ identifier: email, password: pw }),
                             auth: false,
                         });
 
