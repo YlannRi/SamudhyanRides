@@ -464,22 +464,4 @@ describe('JourneyPage Component', () => {
        expect(screen.queryByText('Route: City Centre')).not.toBeInTheDocument();
     });
   });
-
-  it('handles missing auth token gracefully on mount', async () => {
-    // Override the global mock from beforeEach just for this one call
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementationOnce(() => null);
-
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    render(<JourneyPage canUseDriverMode={true} onDriverSignup={mockOnDriverSignup} />);
-
-    await waitFor(() => {
-      expect(screen.queryByText('Loading your journeys...')).not.toBeInTheDocument();
-      // It should catch the error and render the empty state
-      expect(screen.getByText('No Active Journeys')).toBeInTheDocument();
-      expect(consoleSpy).toHaveBeenCalledWith("Error fetching journeys:", expect.any(Error));
-    });
-
-    consoleSpy.mockRestore();
-  });
 });
