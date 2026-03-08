@@ -5,7 +5,7 @@ import {Btn} from './App.tsx';
 import {RideRenderMap} from './components/Map/RideRenderMap';
 
 
-// ─── User Journey View ─────────────────────────────────────────
+// User Journey View
 const UserJourney: React.FC<{ trips: any[] }> = ({ trips }) => {
   const [activeTripIdx, setActiveTripIdx] = useState(0);
 
