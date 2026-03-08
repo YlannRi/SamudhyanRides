@@ -724,5 +724,4 @@ describe('ActivityPage Component', () => {
       expect(screen.getAllByText('Trip Cancelled')[0]).toBeInTheDocument();
     });
   });
-
 });

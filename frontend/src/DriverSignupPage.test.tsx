@@ -17,9 +17,12 @@ describe('DriverSignupPage Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    // Provide a safe default mock so background validation calls never throw unhandled rejections
+    vi.mocked(apiFetch).mockImplementation(async () => ({}));
   });
 
   afterEach(() => {
+    // Ensure timers are always reset, even if a test fails midway
     vi.useRealTimers();
   });
 
@@ -213,14 +216,50 @@ describe('DriverSignupPage Component', () => {
   describe('Debounced Server Validation', () => {
     it('calls the validation API and sets server errors after typing license number', async () => {
       vi.useFakeTimers();
-            vi.mocked(apiFetch).mockResolvedValueOnce({
-        field_errors: { licence_number: 'License not found in server' }
+
+      // Robust routing to prevent timer race conditions grabbing the wrong mock
+      vi.mocked(apiFetch).mockImplementation(async (url) => {
+        if (url.includes('validate')) {
+          return { field_errors: { licence_number: 'License not found in server', vehicle_registration: 'Plate not found' } };
+        }
+        return {};
       });
 
       render(<DriverSignupPage {...mockProps} />);
 
       const licenseInput = screen.getByLabelText(/Licence number/i);
+      const plateInput = screen.getByLabelText(/License plate/i);
 
+      fireEvent.change(licenseInput, { target: { value: 'A1B2C3D4E5F6G7H8' } });
+      fireEvent.blur(licenseInput);
+      fireEvent.change(plateInput, { target: { value: 'AB12 CDE' } });
+      fireEvent.blur(plateInput);
+
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+
+      // Restore real timers BEFORE waitFor, otherwise waitFor stalls!
+      vi.useRealTimers();
+
+      await waitFor(() => {
+        expect(apiFetch).toHaveBeenCalledWith('drivers/validate', expect.objectContaining({ method: 'POST' }));
+        expect(screen.getByText('License not found in server')).toBeInTheDocument();
+        expect(screen.getByText('Plate not found')).toBeInTheDocument();
+      });
+    });
+
+    it('clears server errors if the debounce validation fails (catch block)', async () => {
+      vi.useFakeTimers();
+
+      vi.mocked(apiFetch).mockImplementation(async (url) => {
+        if (url.includes('validate')) throw new Error('Network error');
+        return {};
+      });
+
+      render(<DriverSignupPage {...mockProps} />);
+
+      const licenseInput = screen.getByLabelText(/Licence number/i);
       fireEvent.change(licenseInput, { target: { value: 'A1B2C3D4E5F6G7H8' } });
       fireEvent.blur(licenseInput);
 
@@ -231,13 +270,51 @@ describe('DriverSignupPage Component', () => {
       vi.useRealTimers();
 
       await waitFor(() => {
-        expect(apiFetch).toHaveBeenCalledWith('drivers/validate', expect.objectContaining({ method: 'POST' }));
-        expect(screen.getByText('License not found in server')).toBeInTheDocument();
+        expect(apiFetch).toHaveBeenCalledWith('drivers/validate', expect.anything());
+        // Since it caught an error, it shouldn't crash and should clear errors internally
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       });
+    });
+
+    it('bypasses server validation if fields are emptied out to whitespace', async () => {
+      vi.useFakeTimers();
+      render(<DriverSignupPage {...mockProps} />);
+
+      const licenseInput = screen.getByLabelText(/Licence number/i);
+      fireEvent.change(licenseInput, { target: { value: '   ' } });
+      fireEvent.blur(licenseInput);
+
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+
+      vi.useRealTimers();
+
+      // The early return branch should prevent the API call
+      expect(apiFetch).not.toHaveBeenCalledWith('drivers/validate', expect.anything());
     });
   });
 
   describe('Form Submission', () => {
+    it('submits successfully when form is valid', async () => {
+      vi.mocked(apiFetch).mockImplementation(async () => ({}));
+
+      render(<DriverSignupPage {...mockProps} />);
+      fillValidForm();
+
+      // Simulate a file cancellation to cover empty file branches (`?.name ?? null`)
+      fireEvent.change(screen.getByLabelText(/Vehicle photo — interior/i), { target: { files: [] } });
+
+      const form = screen.getByRole('button', { name: 'Submit driver application' }).closest('form')!;
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(apiFetch).toHaveBeenCalledWith('drivers/upgrade', expect.any(Object));
+        expect(screen.getByText('Saved. Your driver application is now pending verification.')).toBeInTheDocument();
+        expect(mockProps.onComplete).toHaveBeenCalled();
+      });
+    });
+
     it('prevents submission if required fields are empty', async () => {
       render(<DriverSignupPage {...mockProps} />);
 
@@ -250,8 +327,11 @@ describe('DriverSignupPage Component', () => {
     });
 
     it('handles server errors returning specific field issues during submission', async () => {
-      vi.mocked(apiFetch).mockRejectedValueOnce({
-        detail: { field_errors: { vehicle_registration: 'Plate already registered' } }
+      vi.mocked(apiFetch).mockImplementation(async (url) => {
+        if (url.includes('upgrade')) {
+          throw { detail: { field_errors: { vehicle_registration: 'Plate already registered' } } };
+        }
+        return {};
       });
 
       render(<DriverSignupPage {...mockProps} />);
@@ -267,8 +347,11 @@ describe('DriverSignupPage Component', () => {
     });
 
     it('handles general server errors during submission', async () => {
-      vi.mocked(apiFetch).mockRejectedValueOnce({
-        message: 'Internal Server Error. Please try again later.'
+      vi.mocked(apiFetch).mockImplementation(async (url) => {
+        if (url.includes('upgrade')) {
+          throw { message: 'Internal Server Error. Please try again later.' };
+        }
+        return {};
       });
 
       render(<DriverSignupPage {...mockProps} />);
@@ -283,7 +366,10 @@ describe('DriverSignupPage Component', () => {
     });
 
     it('handles submission empty fallback errors lacking a message payload', async () => {
-      vi.mocked(apiFetch).mockRejectedValueOnce({});
+      vi.mocked(apiFetch).mockImplementation(async (url) => {
+        if (url.includes('upgrade')) throw {};
+        return {};
+      });
 
       render(<DriverSignupPage {...mockProps} />);
       fillValidForm();

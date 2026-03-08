@@ -60,10 +60,17 @@ describe('RequestRidePage Component', () => {
   });
 
   it('updates inputs when the user types', () => {
-    render(<RequestRidePage />);
+    const { container } = render(<RequestRidePage />);
 
     fireEvent.change(screen.getByPlaceholderText('e.g. Oldfield Park'), { target: { value: 'Oldfield Park' } });
     fireEvent.change(screen.getByPlaceholderText('e.g. University of Bath'), { target: { value: 'City Centre' } });
+
+    // Ensure the time input change handler is also covered
+    const timeInput = container.querySelector('input[type="datetime-local"]');
+    if (timeInput) {
+      fireEvent.change(timeInput, { target: { value: '2026-12-25T14:30' } });
+      expect(timeInput).toHaveValue('2026-12-25T14:30');
+    }
 
     expect(screen.getByPlaceholderText('e.g. Oldfield Park')).toHaveValue('Oldfield Park');
     expect(screen.getByPlaceholderText('e.g. University of Bath')).toHaveValue('City Centre');
@@ -79,6 +86,19 @@ describe('RequestRidePage Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText('No authentication token found. Please log in again.')).toBeInTheDocument();
+    });
+  });
+
+  it('handles non-Error exceptions during search to cover ternary branch', async () => {
+    // Mock the API to throw a string instead of an Error object
+    vi.mocked(apiFetch).mockRejectedValueOnce('String-based search error');
+
+    render(<RequestRidePage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('String-based search error')).toBeInTheDocument();
     });
   });
 
@@ -183,5 +203,65 @@ describe('RequestRidePage Component', () => {
     // Verify we went back to search screen
     expect(screen.getByText('Request a Ride')).toBeInTheDocument();
     expect(screen.queryByText('Book Ride #101')).not.toBeInTheDocument();
+  });
+
+  it('shows an error if booking fails due to missing auth token', async () => {
+    const mockRides = [{ id: 101, destination: 'University of Bath', price: '£3.50' }];
+    vi.mocked(apiFetch).mockResolvedValueOnce(mockRides);
+
+    render(<RequestRidePage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Request' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Request' }));
+
+    // Force localStorage to return null to simulate an expired token
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValueOnce(null);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Request Without Specific Pickup' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('No authentication token found.')).toBeInTheDocument();
+    });
+  });
+
+  it('shows an error if booking API fails with an Error object', async () => {
+    const mockRides = [{ id: 101, destination: 'University of Bath', price: '£3.50' }];
+    vi.mocked(apiFetch).mockResolvedValueOnce(mockRides);
+
+    render(<RequestRidePage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Request' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Request' }));
+
+    // Mock an API rejection with an Error object
+    vi.mocked(apiFetch).mockRejectedValueOnce(new Error('Booking system offline'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Request Without Specific Pickup' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Booking system offline')).toBeInTheDocument();
+    });
+  });
+
+  it('handles non-Error exceptions during booking to cover ternary branch', async () => {
+    const mockRides = [{ id: 101, destination: 'University of Bath', price: '£3.50' }];
+    vi.mocked(apiFetch).mockResolvedValueOnce(mockRides);
+
+    render(<RequestRidePage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Request' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Request' }));
+
+    // Mock an API rejection with a raw string
+    vi.mocked(apiFetch).mockRejectedValueOnce('String-based booking error');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Request Without Specific Pickup' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('String-based booking error')).toBeInTheDocument();
+    });
   });
 });

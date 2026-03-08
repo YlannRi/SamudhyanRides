@@ -367,5 +367,4 @@ describe('App Component', () => {
       }
     });
   });
-
 });
