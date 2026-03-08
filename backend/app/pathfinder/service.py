@@ -35,15 +35,35 @@ def geocode_address(q: str) -> list:
     if not response.ok:
         raise HTTPException(status_code=502, detail=f"ORS geocode error: {response.text}")
 
-    results = []
-    for f in response.json().get("features", []):
-        coords = f["geometry"]["coordinates"]  # [lng, lat]
-        results.append({
-            "label": f["properties"].get("label", ""),
+    data = response.json()
+
+    features = data.get("features", [])
+
+    # check location exists
+    if not features:
+        raise HTTPException(status_code=404, detail="Location not found")
+
+    valid_results = []
+    # check location in UK
+    for feature in features:
+        props = feature["properties"]
+
+        if props.get("country_a") != "GBR":
+            continue
+
+        coords = feature["geometry"]["coordinates"]
+
+        valid_results.append({
+            "label": props["label"],
             "lng": coords[0],
             "lat": coords[1],
         })
-    return results
+
+    if not valid_results:
+        raise HTTPException(status_code=400, detail="Location must be in the United Kingdom")
+
+    return valid_results
+
 
 def optimize_route(origin: Coordinate, destination: Coordinate, pickups: List[Coordinate]) -> List[Coordinate]:
     api_key = os.getenv("OPENROUTE_KEY")

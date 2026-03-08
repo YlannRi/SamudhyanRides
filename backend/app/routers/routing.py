@@ -24,10 +24,7 @@ async def test_bath_route():
     return calculate_route(route_request)
 
 
-
-
-
-# geocde address search
+# geocode address search
 @router.get("/geocode")
 async def geocode_address_endpoint(q: str = Query(..., description="Address or place name")):
     return geocode_address(q)
