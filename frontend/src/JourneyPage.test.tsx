@@ -103,14 +103,14 @@ describe('JourneyPage Component', () => {
   });
 
   it('renders empty state for user when there are no active trips', async () => {
-  globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => [] })) as any;
+    globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => [] })) as any;
 
-  render(<JourneyPage canUseDriverMode={true} onDriverSignup={mockOnDriverSignup} />);
+    render(<JourneyPage canUseDriverMode={true} onDriverSignup={mockOnDriverSignup} />);
 
-  await waitFor(() => {
-    expect(screen.getByText('No Active Journeys')).toBeInTheDocument();
-  });
-});
+    await waitFor(() => {
+      expect(screen.getByText('No Active Journeys')).toBeInTheDocument();
+      });
+    });
 
   it('calls onDriverSignup when attempting to switch to Driver mode without permission', async () => {
     render(<JourneyPage canUseDriverMode={false} onDriverSignup={mockOnDriverSignup} />);
@@ -184,8 +184,6 @@ describe('JourneyPage Component', () => {
       expect(screen.queryByText('Route: City Centre')).not.toBeInTheDocument();
     });
   });
-
-  // --- NEW USER JOURNEY TESTS ---
 
   it('allows user to switch between multiple active trips', async () => {
     const multipleTrips = [
@@ -463,5 +461,24 @@ describe('JourneyPage Component', () => {
        // After completing, the ride state updates and the ride is removed
        expect(screen.queryByText('Route: City Centre')).not.toBeInTheDocument();
     });
+  });
+
+  it('does nothing when completing a ride if no token is found', async () => {
+    render(<JourneyPage canUseDriverMode={true} onDriverSignup={mockOnDriverSignup} />);
+    await waitFor(() => expect(screen.queryByText('Loading your journeys...')).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Driver' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Complete Ride/i })).toBeInTheDocument());
+
+    // Mock missing token directly before the click
+    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue(null);
+
+    fireEvent.click(screen.getByRole('button', { name: /Complete Ride/i }));
+
+    // Completion endpoint should never be hit
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/complete'),
+      expect.any(Object)
+    );
   });
 });

@@ -20,13 +20,11 @@ describe('HomePage Component', () => {
     render(<HomePage {...mockProps} />);
 
     expect(screen.getByText('SamudhyanRides')).toBeInTheDocument();
-    // Fixed: 'Where to?' is now 'Request a ride' in the default Rides mode
     expect(screen.getByText('Request a ride')).toBeInTheDocument();
     expect(screen.getByText('Shortcuts')).toBeInTheDocument();
     expect(screen.getByText('Services')).toBeInTheDocument();
   });
 
-  // Fixed: Updated test name and text query
   it('handles "Request a ride" click in default user mode', () => {
     render(<HomePage {...mockProps} />);
     fireEvent.click(screen.getByText('Request a ride'));
@@ -34,7 +32,6 @@ describe('HomePage Component', () => {
     expect(mockProps.onRequestRide).toHaveBeenCalledWith(); // Empty prefill
   });
 
-  // Fixed: Updated test name and text query for driver mode
   it('switches to Driver mode and handles "Post a ride" for an authorized driver', () => {
     render(<HomePage {...mockProps} canUseDriverMode={true} />);
 
@@ -43,7 +40,6 @@ describe('HomePage Component', () => {
 
     expect(driverTab).toHaveClass('toggle-tab-active');
 
-    // Fixed: Once in Driver mode, the button text changes to 'Post a ride'
     fireEvent.click(screen.getByText('Post a ride'));
     expect(mockProps.onPostRide).toHaveBeenCalledTimes(1);
   });
@@ -60,6 +56,33 @@ describe('HomePage Component', () => {
 
     fireEvent.click(screen.getByText('Timetable'));
     expect(mockProps.onOpenTimetable).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles corrupted localStorage data for saved places', () => {
+    localStorage.setItem('savedPlaces', '{invalid-json');
+    render(<HomePage {...mockProps} />);
+
+    expect(screen.queryByText('Saved place')).not.toBeInTheDocument();
+  });
+
+  it('calls onDriverSignup when attempting to switch to Driver mode without permission', () => {
+    render(<HomePage {...mockProps} canUseDriverMode={false} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Driver' }));
+    expect(mockProps.onDriverSignup).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the save place modal when clicking the backdrop', () => {
+    render(<HomePage {...mockProps} />);
+
+    fireEvent.click(screen.getByText('Save a place'));
+
+    const backdrop = document.querySelector('.modal-backdrop');
+    if (backdrop) {
+      fireEvent.click(backdrop);
+    }
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   describe('Saved Places flow', () => {

@@ -131,6 +131,69 @@ describe('LoginPage Component', () => {
     });
   });
 
+  it('throws an error if login succeeds but no token is returned', async () => {
+    // Covers Line 81: Else branch throwing manual error
+    vi.mocked(apiFetch).mockResolvedValueOnce({ success: true, message: 'Where is the token?' });
+
+    render(<LoginPage {...mockProps} />);
+
+    fireEvent.change(screen.getByLabelText('Email or university username'), { target: { value: 'test@bath.ac.uk' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Invalid login credentials.')).toBeInTheDocument();
+      expect(mockProps.onAuthSuccess).not.toHaveBeenCalled();
+    });
+  });
+
+  it('handles auto-login failure after successful driver registration', async () => {
+    // Covers Lines 124-126: Catch block inside driver upgrade
+    vi.mocked(apiFetch).mockResolvedValueOnce({ message: 'Success' }); // register
+    vi.mocked(apiFetch).mockRejectedValueOnce(new Error('Auto-login network error')); // auto-login
+
+    render(<LoginPage {...mockProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Mark' } });
+    fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Taylor' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'mark@bath.ac.uk' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'driverpass' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'driverpass' } });
+
+    fireEvent.click(screen.getByLabelText('Do you want to sign up as a driver?'));
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Auto-login network error')).toBeInTheDocument();
+      // Should cleanly revert to login mode
+      expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
+    });
+  });
+
+  it('toggles back to login mode from signup mode', () => {
+    // Covers Line 151: onClick for mode === 'login'
+    render(<LoginPage {...mockProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+    expect(screen.getByLabelText('First name')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
+    expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
+  });
+
+  it('handles middle names input correctly', () => {
+    // Covers Line 207: onChange handler for middleNames
+    render(<LoginPage {...mockProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+
+    const middleNameInput = screen.getByLabelText('Middle names (optional)');
+    fireEvent.change(middleNameInput, { target: { value: 'Danger' } });
+
+    expect(middleNameInput).toHaveValue('Danger');
+  });
 
 it('handles driver signup flow (register -> auto-login -> trigger driver signup page)', async () => {
     // 1st call: register success
