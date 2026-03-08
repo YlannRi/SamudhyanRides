@@ -36,15 +36,12 @@ const PostRidePage: React.FC = () => {
         geocodeAddress(destination),
       ]);
 
-      if (originResults.length === 0) {
-        throw new Error('Could not find coordinates for the Start location.');
-      }
-      if (destResults.length === 0) {
-        throw new Error('Could not find coordinates for the destination.');
-      }
-
       const originCoords = originResults[0];
       const destCoords = destResults[0];
+
+      if (!originCoords || !destCoords) {
+        throw new Error("Location not found")
+      }
 
       // Backend expects RideCreate
       const payload = {

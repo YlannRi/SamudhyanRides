@@ -31,7 +31,7 @@ export const useGeocode = () => {
       console.error('Error during geocoding:', err);
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg || 'Failed to geocode address');
-      return [];
+      throw err;
     } finally {
       setLoading(false);
     }
