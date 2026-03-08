@@ -316,4 +316,56 @@ describe('App Component', () => {
       expect(screen.getByTestId('driver-signup-page')).toBeInTheDocument();
     });
   });
+
+  describe('Edge Cases, Routing, and Error Handling', () => {
+    it('handles popstate events for browser navigation', async () => {
+      vi.mocked(apiFetch).mockResolvedValueOnce({ is_driver: true });
+      render(<App />);
+      fireEvent.click(screen.getByText('Login'));
+      await waitFor(() => expect(screen.getByTestId('home-page')).toBeInTheDocument());
+
+      // Simulate a browser back button changing the URL
+      window.history.pushState({}, '', '/account');
+      fireEvent(window, new PopStateEvent('popstate'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('account-page')).toBeInTheDocument();
+      });
+    });
+
+    it('logs out the user if the initial users/me fetch returns a 401', async () => {
+      localStorage.setItem('authToken', 'fake-token');
+      // Mock the initial fetch to fail with a 401
+      vi.mocked(apiFetch).mockRejectedValueOnce({ status: 401 });
+
+      render(<App />);
+
+      await waitFor(() => {
+        // Should clear the token and show the login page
+        expect(localStorage.getItem('authToken')).toBeNull();
+        expect(screen.getByTestId('login-page')).toBeInTheDocument();
+      });
+    });
+
+    it('renders the correct tabs based on direct path routing', async () => {
+      vi.mocked(apiFetch).mockResolvedValue({ is_driver: true });
+
+      const pathsToTest = [
+        { path: '/post-ride', testId: 'post-ride-page' },
+        { path: '/request-ride', testId: 'request-page' },
+        { path: '/settings', testId: 'settings-page' },
+        { path: '/safety', testId: 'safety-page' }
+      ];
+
+      for (const { path, testId } of pathsToTest) {
+        window.history.replaceState({}, '', path);
+        render(<App />);
+        fireEvent.click(screen.getByText('Login')); // Trigger auth
+        await waitFor(() => {
+          expect(screen.getByTestId(testId)).toBeInTheDocument();
+        });
+      }
+    });
+  });
+
 });

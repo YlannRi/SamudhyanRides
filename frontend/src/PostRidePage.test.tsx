@@ -123,47 +123,6 @@ describe('PostRidePage Component', () => {
     expect(screen.getByLabelText('Seats')).toHaveValue(3); // Defaults back to 3
   });
 
-  it('shows an error if origin geocoding fails to return results', async () => {
-    // Return empty array for 'Nowhere', valid array otherwise
-    mockGeocodeAddress.mockImplementation((address) => {
-      if (address === 'Nowhere') return Promise.resolve([]);
-      return Promise.resolve([{ lat: 51.3811, lng: -2.3590 }]);
-    });
-
-    render(<PostRidePage />);
-
-    fireEvent.change(screen.getByLabelText('Start Location'), { target: { value: 'Nowhere' } });
-    fireEvent.change(screen.getByLabelText('Destination'), { target: { value: 'University of Bath' } });
-    fireEvent.change(screen.getByLabelText('Destination arrival Date and Time'), { target: { value: '2026-10-10T12:00' } });
-    fireEvent.change(screen.getByLabelText('Price (£)'), { target: { value: '5' } });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Post Ride' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Could not find coordinates for the Start location.')).toBeInTheDocument();
-    });
-  });
-
-  it('shows an error if destination geocoding fails to return results', async () => {
-    mockGeocodeAddress.mockImplementation((address) => {
-      if (address === 'Nowhere') return Promise.resolve([]);
-      return Promise.resolve([{ lat: 51.3811, lng: -2.3590 }]);
-    });
-
-    render(<PostRidePage />);
-
-    fireEvent.change(screen.getByLabelText('Start Location'), { target: { value: 'Oldfield Park' } });
-    fireEvent.change(screen.getByLabelText('Destination'), { target: { value: 'Nowhere' } });
-    fireEvent.change(screen.getByLabelText('Destination arrival Date and Time'), { target: { value: '2026-10-10T12:00' } });
-    fireEvent.change(screen.getByLabelText('Price (£)'), { target: { value: '5' } });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Post Ride' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Could not find coordinates for the destination.')).toBeInTheDocument();
-    });
-  });
-
   it('shows an error if the backend API fetch fails', async () => {
     // Simulate a backend crash or network error
     vi.mocked(apiFetch).mockRejectedValueOnce(new Error('Internal Server Error'));

@@ -196,4 +196,65 @@ describe('AccountPage Component', () => {
     const contactBtn = screen.getByText(/Call your trusted contact$/);
     expect(contactBtn).toBeDisabled();
   });
+
+  describe('Edge Cases & Accessibility', () => {
+    it('handles keyboard events for InfoCard accessibility', async () => {
+      vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+      render(<AccountPage {...mockProps} />);
+
+      const timetableCard = screen.getByText('Your timetable').closest('.info-card');
+      expect(timetableCard).toBeInTheDocument();
+
+      // Ignore random keys
+      fireEvent.keyDown(timetableCard!, { key: 'A' });
+      expect(mockProps.onOpenTimetable).not.toHaveBeenCalled();
+
+      // Trigger on Enter
+      fireEvent.keyDown(timetableCard!, { key: 'Enter' });
+      expect(mockProps.onOpenTimetable).toHaveBeenCalledTimes(1);
+
+      // Trigger on Space
+      fireEvent.keyDown(timetableCard!, { key: ' ' });
+      expect(mockProps.onOpenTimetable).toHaveBeenCalledTimes(2);
+    });
+
+    it('displays "No rating" if the user has a rating of 0, null, or undefined', async () => {
+      vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 0 }]);
+      render(<AccountPage {...mockProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('★ No rating')).toBeInTheDocument();
+      });
+    });
+
+    it('gracefully handles invalid JSON in trustedContacts', async () => {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => {
+        if (key === 'authToken') return 'fake-jwt-token';
+        if (key === 'trustedContacts') return '{ invalid: json ]';
+        return null;
+      });
+
+      vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+      render(<AccountPage {...mockProps} />);
+
+      fireEvent.click(screen.getByText('Safety Alarm'));
+      // Should default to disabled call button
+      const contactBtn = screen.getByText(/Call your trusted contact/);
+      expect(contactBtn).toBeDisabled();
+    });
+
+    it('uses the first contact if no contact is marked as primary', async () => {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => {
+        if (key === 'authToken') return 'fake-jwt-token';
+        if (key === 'trustedContacts') return JSON.stringify([{ id: '1', firstName: 'John', lastName: 'Doe', phone: '07000000000' }]);
+        return null;
+      });
+
+      vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
+      render(<AccountPage {...mockProps} />);
+
+      fireEvent.click(screen.getByText('Safety Alarm'));
+      expect(screen.getByText('Call your trusted contact (John Doe)')).toBeInTheDocument();
+    });
+  });
 });

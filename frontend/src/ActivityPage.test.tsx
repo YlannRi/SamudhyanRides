@@ -680,4 +680,49 @@ describe('ActivityPage Component', () => {
     await waitFor(() => { expect(screen.getByTestId('mock-map')).toBeInTheDocument(); });
   });
 
+  describe('Edge Cases and Missing Branches', () => {
+
+    it('closes the filter dropdown when an option is selected', async () => {
+      const mockDriverRides = [{
+        id: 201, destination: 'Oldfield Park', status: 'upcoming', bookings: [{ id: 301, status: 'pending', dropoff_location: 'Supermarket' }]
+      }];
+      vi.mocked(apiFetch).mockResolvedValueOnce([]).mockResolvedValueOnce(mockDriverRides).mockResolvedValue([]);
+
+      render(<ActivityPage {...mockProps} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Driver' }));
+
+      // Open filter
+      await waitFor(() => { fireEvent.click(screen.getByText('Cost ▾')); });
+      expect(screen.getByText('Ease')).toBeInTheDocument();
+
+      // Click option
+      fireEvent.click(screen.getByText('Ease'));
+
+      // Dropdown should be closed
+      expect(screen.queryByText('Cost')).not.toBeInTheDocument();
+      expect(screen.getByText('Ease ▾')).toBeInTheDocument();
+    });
+
+    it('prevents closing the modal via overlay click when it is in a success state', async () => {
+      const mockRiderBookings = [{ id: 101, status: 'confirmed', ride: { destination: 'Campus' } }];
+      vi.mocked(apiFetch).mockResolvedValueOnce(mockRiderBookings).mockResolvedValue([]);
+      render(<ActivityPage {...mockProps} />);
+
+      await waitFor(() => { fireEvent.click(screen.getAllByText('More')[0]); });
+      await waitFor(() => { fireEvent.click(screen.getByText('Cancel Trip')); });
+
+      vi.mocked(apiFetch).mockResolvedValueOnce({});
+      fireEvent.click(screen.getByRole('button', { name: 'Yes, Cancel' }));
+
+      await waitFor(() => { expect(screen.getAllByText('Trip Cancelled')[0]).toBeInTheDocument(); });
+
+      // Click the overlay
+      const overlay = document.querySelector('.rating-modal-overlay');
+      fireEvent.click(overlay!);
+
+      // The success modal should still be in the document (it ignores the click)
+      expect(screen.getAllByText('Trip Cancelled')[0]).toBeInTheDocument();
+    });
+  });
+
 });
