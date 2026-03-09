@@ -740,7 +740,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               <RideRenderMap
                 rideId={trip.ride_id}
                 height="220px"
-                interactive={false}
+                interactive={true}
                 existingPickup={
                   trip.pickup_lat && trip.pickup_lng
                     ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
