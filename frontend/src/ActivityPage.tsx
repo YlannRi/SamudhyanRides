@@ -894,6 +894,20 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
     setLoading(true);
     setError(null);
     try {
+      const formatTime = (iso?: string) => {
+          if (!iso) return 'Pending';
+
+          const date = new Date(iso);
+
+          return date.toLocaleString('en-GB', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              hour: '2-digit',
+              minute: '2-digit',
+          });
+      };
+
       if (mode === 'user') {
         const data = await apiFetch<any>('bookings/me', { method: 'GET' });
 
@@ -906,7 +920,7 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
             username: rideData.driver?.first_name ? `${rideData.driver.first_name} ${rideData.driver.last_name}` :
               b.passenger_name || `User ${b.user_id?.substring(0, 4)}`,
             destination: b.dropoff_location || rideData.destination || 'Destination',
-            time: b.pickup_time || rideData.departure_time || 'Pending',
+            time: formatTime(b.pickup_time || rideData.departure_time),
             price: `£${b.price || '0.00'}`,
             status: b.status === 'pending' ? 'requested' :
               b.status === 'confirmed' ? (rideData.status === 'in_progress' ? 'activeUser' : 'upcomingUser') :
@@ -926,7 +940,7 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
             id: ride.id,
             ride_id: ride.id,
             destination: ride.destination,
-            time: ride.departure_time,
+            time: formatTime(ride.departure_time),
             status: ride.status === 'completed' ? 'pastDriver' :
               ride.status === 'in_progress' ? 'activeDriver' : 'upcomingDriver',
             action: 'More',
@@ -950,7 +964,7 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
                 ride_id: ride.id,
                 username: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown Passenger',
                 destination: b.dropoff_location,
-                time: b.pickup_time || ride.departure_time,
+                time: formatTime(b.pickup_time || ride.departure_time),
                 price: `£${b.price}`,
                 status: 'passengerRequest',
                 action: 'More',
