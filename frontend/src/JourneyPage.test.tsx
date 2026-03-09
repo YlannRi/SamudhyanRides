@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import JourneyPage from './JourneyPage';
 
 // Mock the map component so it doesn't crash in tests
@@ -121,6 +121,31 @@ describe('JourneyPage Component', () => {
 
     expect(mockOnDriverSignup).toHaveBeenCalledTimes(1);
     expect(screen.getByText('John Doe')).toBeInTheDocument();
+  });
+
+  it('allows toggling back and forth between Rider and Driver modes', async () => {
+    render(<JourneyPage canUseDriverMode={true} onDriverSignup={mockOnDriverSignup} />);
+
+    // Wait for initial Rider load
+    await waitFor(() => expect(screen.queryByText('Loading your journeys...')).not.toBeInTheDocument());
+    expect(screen.getByText('John Doe')).toBeInTheDocument();
+
+    // Switch to Driver
+    fireEvent.click(screen.getByRole('button', { name: 'Driver' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Route: City Centre')).toBeInTheDocument();
+      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+    });
+
+    // Switch back to Rider
+    fireEvent.click(screen.getByRole('button', { name: 'Rider' }));
+
+    await waitFor(() => {
+      // Should show the Rider UI again
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.queryByText('Route: City Centre')).not.toBeInTheDocument();
+    });
   });
 
   it('toggles to Driver mode and renders active drives successfully', async () => {
