@@ -85,6 +85,25 @@ describe('HomePage Component', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('switches back to user mode when the "Rides" tab is clicked', () => {
+    render(<HomePage {...mockProps} canUseDriverMode={true} />);
+
+    // First, switch to Driver mode
+    const driverTab = screen.getByRole('button', { name: 'Driver' });
+    fireEvent.click(driverTab);
+
+    // Verify we are in driver mode
+    expect(screen.getByText('Post a ride')).toBeInTheDocument();
+
+    // Now, click the Rides tab to trigger line 89
+    const ridesTab = screen.getByRole('button', { name: 'Rides' });
+    fireEvent.click(ridesTab);
+
+    // Verify we are back in user mode
+    expect(screen.getByText('Request a ride')).toBeInTheDocument();
+    expect(ridesTab).toHaveClass('toggle-tab-active');
+  });
+
   describe('Saved Places flow', () => {
     it('opens and closes the save place modal without saving', () => {
       render(<HomePage {...mockProps} />);

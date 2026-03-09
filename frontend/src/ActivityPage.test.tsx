@@ -680,6 +680,31 @@ describe('ActivityPage Component', () => {
     await waitFor(() => { expect(screen.getByTestId('mock-map')).toBeInTheDocument(); });
   });
 
+  it('switches back to Rider mode from Driver mode', async () => {
+    vi.mocked(apiFetch).mockResolvedValue([]);
+    render(<ActivityPage {...mockProps} />);
+
+    // Wait for the initial load to finish
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Rider' })).toHaveClass('toggle-tab-active');
+    });
+
+    // Switch to Driver mode
+    const driverTab = screen.getByRole('button', { name: 'Driver' });
+    fireEvent.click(driverTab);
+    await waitFor(() => {
+      expect(driverTab).toHaveClass('toggle-tab-active');
+    });
+
+    // Switch back to Rider mode
+    const riderTab = screen.getByRole('button', { name: 'Rider' });
+    fireEvent.click(riderTab);
+
+    await waitFor(() => {
+      expect(riderTab).toHaveClass('toggle-tab-active');
+    });
+  });
+
   describe('Edge Cases and Missing Branches', () => {
 
     it('closes the filter dropdown when an option is selected', async () => {
