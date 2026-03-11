@@ -14,6 +14,8 @@ type Trip = {
   username?: string;
   drivername?: string;
   time?: string;
+  dateOnly?: string;
+  timeOnly?: string;
   price?: string;
   numberPassengers?: number;
   rating?: number;
@@ -832,8 +834,10 @@ const TripSection: React.FC<TripSectionProps> = ({
                 <div className="trip-row-left">
                   <div className="trip-car-icon">🚗</div>
                   <div className="trip-row-text">
-                    <div className="trip-row-title">{trip.destination ?? trip.username ?? 'Trip'}</div>
-                    <div className="trip-row-meta">{trip.time}</div>
+                    <div className="trip-row-title">
+                      {trip.destination ?? trip.username ?? 'Trip'} - {trip.timeOnly && <span className="trip-row-time">{trip.timeOnly}</span>}
+                    </div>
+                    <div className="trip-row-meta">{trip.dateOnly ?? trip.time}</div>
                     {trip.drivername && <div className="trip-row-meta">{trip.drivername}</div>}
                     {trip.username && <div className="trip-row-meta">{trip.username}</div>}
                     {trip.numberPassengers !== undefined && <div className="trip-row-meta">Passengers: {trip.numberPassengers}</div>}
@@ -895,18 +899,38 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
     setError(null);
     try {
       const formatTime = (iso?: string) => {
-          if (!iso) return 'Pending';
+        if (!iso) return 'Pending';
 
-          const date = new Date(iso);
+        const date = new Date(iso);
 
-          return date.toLocaleString('en-GB', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-              hour: '2-digit',
-              minute: '2-digit',
-          });
+        return date.toLocaleString('en-GB', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
       };
+
+      const formatDateOnly = (iso?: string) => {
+        if (!iso) return 'Pending';
+        const date = new Date(iso);
+        return date.toLocaleString('en-GB', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+        });
+      };
+
+      const formatTimeOnly = (iso?: string) => {
+        if (!iso) return '';
+        const date = new Date(iso);
+        return date.toLocaleString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      };
+
 
       if (mode === 'user') {
         const data = await apiFetch<any>('bookings/me', { method: 'GET' });
@@ -921,6 +945,8 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
               b.passenger_name || `User ${b.user_id?.substring(0, 4)}`,
             destination: b.dropoff_location || rideData.destination || 'Destination',
             time: formatTime(b.pickup_time || rideData.departure_time),
+            dateOnly: formatDateOnly(b.pickup_time || rideData.departure_time),
+            timeOnly: formatTimeOnly(b.pickup_time || rideData.departure_time),
             price: `£${b.price || '0.00'}`,
             status: b.status === 'pending' ? 'requested' :
               b.status === 'confirmed' ? (rideData.status === 'in_progress' ? 'activeUser' : 'upcomingUser') :
@@ -941,6 +967,8 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
             ride_id: ride.id,
             destination: ride.destination,
             time: formatTime(ride.departure_time),
+            dateOnly: formatDateOnly(ride.departure_time),
+            timeOnly: formatTimeOnly(ride.departure_time),
             status: ride.status === 'completed' ? 'pastDriver' :
               ride.status === 'in_progress' ? 'activeDriver' : 'upcomingDriver',
             action: 'More',
@@ -965,6 +993,8 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
                 username: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown Passenger',
                 destination: b.dropoff_location,
                 time: formatTime(b.pickup_time || ride.departure_time),
+                dateOnly: formatDateOnly(b.pickup_time || ride.departure_time),
+                timeOnly: formatTimeOnly(b.pickup_time || ride.departure_time),
                 price: `£${b.price}`,
                 status: 'passengerRequest',
                 action: 'More',
