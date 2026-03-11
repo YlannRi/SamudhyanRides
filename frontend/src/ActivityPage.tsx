@@ -462,7 +462,7 @@ const PassengerCarousel: React.FC<{
 
         <div className="sheet-details-card passenger-details">
           <DetailRow label="Pick Up" value={p.pickupLocation} />
-          <DetailRow label="Cost" value={p.cost} valueClass="detail-price" />
+          <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
           {isPast && p.rated && (
             <DetailRow label="Trip Rating" value={`⭐ ${p.triprated}`} valueClass="passenger-rating" />
           )}
@@ -560,7 +560,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
               <DetailRow label="Date & Arrival" value={trip.time ?? '—'} />
               <DetailRow label="Estimated leave" value="Pending" />
-              <DetailRow label="Cost" value={trip.price ?? '—'} valueClass="detail-price" />
+              <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
             </div>
             <div className="sheet-actions">
               <Btn cls="btn-message" icon={Icons.message} label="Message Driver" />
@@ -585,7 +585,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               <DetailRow label="Driver" value={trip.drivername ?? 'Pending'} />
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
               <DetailRow label="Be There For" value={trip.time ?? '—'} />
-              <DetailRow label="Cost" value={trip.price ?? '—'} valueClass="detail-price" />
+              <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
             </div>
             <div className="sheet-actions">
               <Btn cls="btn-message" icon={Icons.message} label="Message Driver" />
@@ -610,7 +610,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
               <DetailRow label="Pick Up Time" value={trip.time ?? '—'} />
               <DetailRow label="Arrival Time" value="09:45" />
-              <DetailRow label="Cost" value={trip.price ?? '—'} valueClass="detail-price" />
+              <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
               {trip.rating !== undefined && (
                 <DetailRow label="Your Rating" value={`⭐ ${trip.rating}`} />
               )}
@@ -681,7 +681,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               )}
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
               <DetailRow label="Drop Off By" value={trip.time ?? '—'} />
-              <DetailRow label="Cost" value={trip.price ?? '—'} valueClass="detail-price" />
+              <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
             </div>
             <div className="sheet-actions">
               <Btn cls="btn-message" icon={Icons.message} label="Message Passenger" />
@@ -703,7 +703,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               <DetailRow label="Arrival" value="~09:45" />
             </div>
             <div className="passenger-section-label">
-              Passengers <span className="passenger-count-badge">{passengers.length}</span>
+              Passengers: <span className="passenger-count-badge">{passengers.length}</span>
             </div>
             <PassengerCarousel
               passengers={passengers}
@@ -842,7 +842,6 @@ const TripSection: React.FC<TripSectionProps> = ({
                     {trip.username && <div className="trip-row-meta">{trip.username}</div>}
                     {trip.numberPassengers !== undefined && <div className="trip-row-meta">Passengers: {trip.numberPassengers}</div>}
                     <div className="trip-row-price">
-                      {trip.price}
                       {trip.rating !== undefined && <> – <span className="trip-row-rating">⭐ {trip.rating}</span></>}
                     </div>
                   </div>
@@ -947,7 +946,7 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
             time: formatTime(b.pickup_time || rideData.departure_time),
             dateOnly: formatDateOnly(b.pickup_time || rideData.departure_time),
             timeOnly: formatTimeOnly(b.pickup_time || rideData.departure_time),
-            price: `£${b.price || '0.00'}`,
+            price: `£2.00`,
             status: b.status === 'pending' ? 'requested' :
               b.status === 'confirmed' ? (rideData.status === 'in_progress' ? 'activeUser' : 'upcomingUser') :
                 b.status === 'completed' ? 'pastUser' : 'cancelled',
@@ -980,7 +979,7 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
                 name: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown',
                 rating: b.passenger?.rider_rating,
                 pickupLocation: b.pickup_location,
-                cost: `£${b.price}`,
+                cost: `£2.00`,
                 rated: false
               }))
           });
@@ -995,7 +994,7 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
                 time: formatTime(b.pickup_time || ride.departure_time),
                 dateOnly: formatDateOnly(b.pickup_time || ride.departure_time),
                 timeOnly: formatTimeOnly(b.pickup_time || ride.departure_time),
-                price: `£${b.price}`,
+                price: `£2.00`,
                 status: 'passengerRequest',
                 action: 'More',
                 pickup_lat: b.pickup_lat,

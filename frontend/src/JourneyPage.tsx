@@ -1,8 +1,8 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import './JourneyPage.css';
-import {DetailRow, Icons} from './App';
-import {Btn} from './App.tsx';
-import {RideRenderMap} from './components/Map/RideRenderMap';
+import { DetailRow, Icons } from './App';
+import { Btn } from './App.tsx';
+import { RideRenderMap } from './components/Map/RideRenderMap';
 
 
 // User Journey View
@@ -72,7 +72,7 @@ const UserJourney: React.FC<{ trips: any[] }> = ({ trips }) => {
         <DetailRow label="Destination" value={trip.dropoff_location || ride.destination || '—'} />
         <DetailRow label="Vehicle" value="Standard Vehicle" />
         <DetailRow label="Departure Time" value={timeOfArrival} />
-        <DetailRow label="Cost" value={`£${trip.price || '0.00'}`} valueClass="detail-price" />
+        <DetailRow label="Cost" value={`£2.00`} valueClass="detail-price" />
       </div>
 
       {/* Action */}
@@ -200,7 +200,7 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
 
           <div className="sheet-details-card journey-passenger-details">
             <DetailRow label="Pick Up" value={<><span className="detail-pin">{Icons.pin}</span>{currentPassenger.pickup_location || 'Map Point'}</>} />
-            <DetailRow label="Cost" value={`£${currentPassenger.price || '0.00'}`} valueClass="detail-price" />
+            <DetailRow label="Cost" value={`£2.00}`} valueClass="detail-price" />
             <DetailRow label="Code" value={currentPassenger.pickup_code || '----'} valueClass="detail-value" />
           </div>
         </div>
@@ -241,7 +241,8 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
 };
 
 // ─── Main JourneyPage ──────────────────────────────────────────
-const JourneyPage: React.FC<{ canUseDriverMode: boolean; onDriverSignup: () => void }> = ({ canUseDriverMode, onDriverSignup }) => {  const [mode, setMode] = useState<'user' | 'driver'>('user');
+const JourneyPage: React.FC<{ canUseDriverMode: boolean; onDriverSignup: () => void }> = ({ canUseDriverMode, onDriverSignup }) => {
+  const [mode, setMode] = useState<'user' | 'driver'>('user');
 
   const [activeUserTrips, setActiveUserTrips] = useState<any[]>([]);
   const [activeDriverRides, setActiveDriverRides] = useState<any[]>([]);

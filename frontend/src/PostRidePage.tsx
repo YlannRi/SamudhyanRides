@@ -7,7 +7,6 @@ const PostRidePage: React.FC = () => {
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [timeInput, setTimeInput] = useState('');
-  const [price, setPrice] = useState(''); // UI-only for now (backend does not store price yet)
   const [seats, setSeats] = useState('3');
 
   // UI State
@@ -67,7 +66,6 @@ const PostRidePage: React.FC = () => {
       setOrigin('');
       setDestination('');
       setTimeInput('');
-      setPrice('');
       setSeats('3');
     } catch (err: unknown) {
       console.error('Error posting ride:', err);
@@ -143,20 +141,7 @@ const PostRidePage: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
-            <div className="auth-field" style={{ flex: 1 }}>
-              <label className="auth-label" htmlFor="post-ride-price">Price (£)</label>
-              <input
-                id="post-ride-price"
-                type="number"
-                step="0.10"
-                min="0"
-                className="auth-input"
-                placeholder="e.g. 5.50"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                required
-              />
-            </div>
+
 
             <div className="auth-field" style={{ width: '100px' }}>
               <label className="auth-label" htmlFor="post-ride-seats">Seats</label>
