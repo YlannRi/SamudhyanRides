@@ -9,15 +9,18 @@ export type RequestRidePrefill = {
 };
 
 type Ride = {
-  id: number;  
+  id: number;
   origin?: string;
   destination?: string;
   departure_time?: string;
+  dateOnly?: string;
+  timeOnly?: string;
   driverName?: string;
   price?: string;
 };
 
-const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }) => {  const [rides, setRides] = useState<Ride[]>([]);
+const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }) => {
+  const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,7 +134,7 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
             ←
           </button>
           <h1 className="activity-title" style={{ margin: 0 }}>
-            Book Ride #{selectedRide.id}
+            {selectedRide.destination ? `Book Ride to ${selectedRide.destination}` : 'Book Ride'}
           </h1>
         </header>
 
@@ -180,6 +183,25 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
       </div>
     );
   }
+
+  const formatDateOnly = (iso?: string) => {
+    if (!iso) return 'Flexible';
+    return new Date(iso).toLocaleString('en-GB', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    });
+  };
+
+  const formatTimeOnly = (iso?: string) => {
+    if (!iso) return '';
+    return new Date(iso).toLocaleString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+
 
   // Search screen
   return (
@@ -250,10 +272,11 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
                 <div className="trip-car-icon">🚗</div>
                 <div className="trip-row-text">
                   <div className="trip-row-title">{ride.destination || `Ride #${ride.id}`}</div>
-                  <div className="trip-row-meta">{ride.departure_time || 'Flexible'}</div>
+                  <div className="trip-row-meta">{formatDateOnly(ride.departure_time)}</div>
+                  {ride.departure_time && <div className="trip-row-meta">{formatTimeOnly(ride.departure_time)}</div>}
                   <div className="trip-row-meta">From: {ride.origin || '—'}</div>
                   {ride.driverName && <div className="trip-row-meta">Driver: {ride.driverName}</div>}
-                  <div className="trip-row-price">{ride.price || 'TBD'}</div>
+                  <div className="trip-row-price">{'£2.00'}</div>
                 </div>
               </div>
               <button
