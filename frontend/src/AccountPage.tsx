@@ -62,9 +62,11 @@ type AccountPageProps = {
   onOpenSettings: () => void;
   onOpenTimetable: () => void;
   onOpenSafetyCheckup: () => void;
+  onOpenInbox?: () => void;
+  unreadCount?: number;
 };
 
-const AccountPage: React.FC<AccountPageProps> = ({ onLogout, onOpenSettings, onOpenTimetable, onOpenSafetyCheckup }) => {  
+const AccountPage: React.FC<AccountPageProps> = ({ onLogout, onOpenSettings, onOpenTimetable, onOpenSafetyCheckup, onOpenInbox, unreadCount = 0 }) => {  
   const [userName, setUserName] = useState<string>('Loading...');
   const [rating, setRating] = useState<number | string>('...');
 
@@ -171,7 +173,7 @@ const AccountPage: React.FC<AccountPageProps> = ({ onLogout, onOpenSettings, onO
         label="Safety Alarm" 
         iconColor="#ff5555"
         onClick={() => setShowSafetyToolkit(true)} />
-        <QuickActionCard emoji="✉" label="Inbox" hasDot />
+        <QuickActionCard emoji="✉" label="Inbox" hasDot={unreadCount > 0} onClick={onOpenInbox} />
       </div>
 
       <InfoCard

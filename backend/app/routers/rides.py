@@ -37,16 +37,15 @@ def get_profile_id(auth_user_id: str):
 @router.get("/driver/dashboard")
 def get_driver_dashboard(current_user: dict = Depends(get_current_user)):
     """
-    Returns all upcoming rides for the driver with nested bookings and passenger profiles.
-    Used for the 'My Rides' / management view.
+    Returns all non-cancelled rides for the driver with nested bookings and passenger profiles.
+    Used for driver activity and journey views, including past completed rides.
     """
     profile_id = get_profile_id(current_user["sub"])
     
-    # Fetch the driver's upcoming rides
+    # Fetch the driver's rides, including completed ones for past-trip views.
     rides_res = supabase.table("rides") \
         .select("*") \
         .eq("driver_id", profile_id) \
-        .neq("status", "completed") \
         .neq("status", "cancelled") \
         .execute()
     

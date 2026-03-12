@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import routing, users, drivers, rides, bookings, payments, ratings, incidents, auth, timetable
+from app.routers import routing, users, drivers, rides, bookings, payments, ratings, incidents, auth, timetable, chat, notification
 import uvicorn
 
 app = FastAPI(title="Samudhyan Rides - Backend", version  = "1.0.1")
@@ -32,6 +32,8 @@ app.include_router(bookings.router)
 app.include_router(payments.router)
 app.include_router(ratings.router)
 app.include_router(incidents.router)
+app.include_router(chat.router)
+app.include_router(notification.router)
 
 @app.get("/")
 def read_root():
