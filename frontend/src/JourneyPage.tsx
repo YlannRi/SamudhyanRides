@@ -23,7 +23,6 @@ const UserJourney: React.FC<{ trips: any[] }> = ({ trips }) => {
   const ride = trip.ride || {};
   const driver = ride.driver || {};
   const driverName = driver.first_name ? `${driver.first_name} ${driver.last_name}` : 'Unknown Driver';
-
   // Format departure time
   const departureDate = new Date(ride.departure_time || trip.pickup_time);
   const timeOfArrival = isNaN(departureDate.getTime()) ? 'Pending' : departureDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -59,7 +58,9 @@ const UserJourney: React.FC<{ trips: any[] }> = ({ trips }) => {
       </div>
 
       {/* Map */}
-      <RideRenderMap rideId={trip.ride_id} height="300px" interactive={true} />
+      <div style={{ marginBottom: '16px' }}>
+        <RideRenderMap rideId={trip.ride_id} height="300px" interactive={true} />
+      </div>
 
       {/* Pickup code */}
       <div className="journey-code-card">
@@ -68,7 +69,7 @@ const UserJourney: React.FC<{ trips: any[] }> = ({ trips }) => {
       </div>
 
       {/* Trip details */}
-      <div className="sheet-details-card">
+      <div className="journey-passenger-card">
         <DetailRow label="Destination" value={trip.dropoff_location || ride.destination || '—'} />
         <DetailRow label="Vehicle" value="Standard Vehicle" />
         <DetailRow label="Departure Time" value={timeOfArrival} />
@@ -200,7 +201,7 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
 
           <div className="sheet-details-card journey-passenger-details">
             <DetailRow label="Pick Up" value={<><span className="detail-pin">{Icons.pin}</span>{currentPassenger.pickup_location || 'Map Point'}</>} />
-            <DetailRow label="Cost" value={`£2.00}`} valueClass="detail-price" />
+            <DetailRow label="Cost" value={`£2.00`} valueClass="detail-price" />
             <DetailRow label="Code" value={currentPassenger.pickup_code || '----'} valueClass="detail-value" />
           </div>
         </div>
@@ -261,6 +262,7 @@ const JourneyPage: React.FC<{ canUseDriverMode: boolean; onDriverSignup: () => v
       if (userRes.ok) {
         const userData = await userRes.json();
         const activeBookings = userData.filter((b: any) => b.status === 'confirmed' && b.ride?.status === 'in_progress');
+        console.log("Active bookings:", activeBookings);
         setActiveUserTrips(activeBookings);
       }
 
@@ -279,6 +281,8 @@ const JourneyPage: React.FC<{ canUseDriverMode: boolean; onDriverSignup: () => v
     } finally {
       setLoading(false);
     }
+
+
   };
 
   useEffect(() => {
