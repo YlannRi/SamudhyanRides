@@ -3,6 +3,7 @@ stripe
 email-validator
 fastapi
 uvicorn
+websockets
 pydantic
 python-dotenv
 requests

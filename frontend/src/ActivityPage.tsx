@@ -10,6 +10,7 @@ import { apiFetch } from './lib/api';
 type Trip = {
   id: number;
   ride_id?: number;
+  passenger_profile_id?: string;
   destination?: string;
   username?: string;
   drivername?: string;
@@ -406,6 +407,7 @@ const Modal: React.FC<{
 // Passenger Carousel - when driver views past and upcoming users at bottom
 type Passenger = {
   id: number;
+  profileId?: string;
   name: string;
   rating?: number;
   pickupLocation?: string;
@@ -419,7 +421,8 @@ const PassengerCarousel: React.FC<{
   isPast: boolean;
   onRatePassenger?: (p: Passenger) => void;
   onRemovePassenger?: (p: Passenger) => void;
-}> = ({ passengers, isPast, onRatePassenger, onRemovePassenger }) => {
+  onMessage?: (p: Passenger) => void;
+}> = ({ passengers, isPast, onRatePassenger, onRemovePassenger, onMessage }) => {
   const [idx, setIdx] = useState(0);
 
   // ADD THIS EARLY RETURN CHECK
@@ -469,7 +472,7 @@ const PassengerCarousel: React.FC<{
         </div>
 
         <div className="passenger-actions">
-          <Btn cls="btn-message" icon={Icons.message} label="Message" small />
+          <Btn cls="btn-message" icon={Icons.message} label="Message" small onClick={() => onMessage?.(p)} />
           {isPast ? (
             <>
               {!p.rated && (
@@ -488,7 +491,13 @@ const PassengerCarousel: React.FC<{
 
 
 // Trip Details Panel - bit beneath the map when you press more
-const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose: () => void }> = ({ trip, onClose }) => {
+const TripDetailsPanel: React.FC<{
+  trip: Trip;
+  mode: 'user' | 'Driver';
+  onClose: () => void;
+  onOpenChat?: (rideId: string, participantId?: string) => void;
+  onRideStarted?: () => void;
+}> = ({ trip, onClose, onOpenChat, onRideStarted }) => {
   const [closing, setClosing] = useState(false);
   const [modal, setModal] = useState<ModalState | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -497,7 +506,14 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
   const openModal = (m: ModalState) => setModal(m);
   const closeModal = () => setModal(null);
   // Called when action is confirmed + success shown — dismiss modal then sheet
-  const doneModal = () => { setModal(null); close(); };
+  const doneModal = () => {
+    const completedType = modal?.type;
+    setModal(null);
+    close();
+    if (completedType === 'start') {
+      window.setTimeout(() => onRideStarted?.(), 320);
+    }
+  };
 
   // Add 'startRide' to the type signature
   const handleAction = async (type: 'accept' | 'deny' | 'cancelBooking' | 'removePassenger' | 'cancelRide' | 'startRide', targetId: number) => {
@@ -563,7 +579,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
             </div>
             <div className="sheet-actions">
-              <Btn cls="btn-message" icon={Icons.message} label="Message Driver" />
+              <Btn cls="btn-message" icon={Icons.message} label="Message Driver" onClick={() => trip.ride_id && onOpenChat?.(String(trip.ride_id))} />
               <Btn cls="btn-cancel" icon={Icons.cancel} label="Cancel Trip"
                 onClick={() => openModal({
                   type: 'cancel',
@@ -588,7 +604,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
             </div>
             <div className="sheet-actions">
-              <Btn cls="btn-message" icon={Icons.message} label="Message Driver" />
+              <Btn cls="btn-message" icon={Icons.message} label="Message Driver" onClick={() => trip.ride_id && onOpenChat?.(String(trip.ride_id))} />
               <Btn cls="btn-cancel" icon={Icons.cancel} label="Cancel Trip"
                 onClick={() => openModal({
                   type: 'cancel',
@@ -616,7 +632,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               )}
             </div>
             <div className="sheet-actions">
-              <Btn cls="btn-message" icon={Icons.message} label="Message Driver" />
+              <Btn cls="btn-message" icon={Icons.message} label="Message Driver" onClick={() => trip.ride_id && onOpenChat?.(String(trip.ride_id))} />
               {trip.rating === undefined && (
                 <Btn cls="btn-rate" icon={Icons.star} label="Rate Trip"
                   onClick={() => openModal({
@@ -646,6 +662,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               passengers={passengers}
               isPast={false}
               onRemovePassenger={(p) => openModal({ type: 'remove', passengerName: p.name, bookingId: p.id })}
+              onMessage={(p) => trip.ride_id && onOpenChat?.(String(trip.ride_id), p.profileId)}
             />
             <div className="sheet-actions" style={{ marginTop: 12 }}>
               <Btn cls="btn-cancel" icon={Icons.cancel} label="Cancel Whole Trip"
@@ -684,7 +701,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
             </div>
             <div className="sheet-actions">
-              <Btn cls="btn-message" icon={Icons.message} label="Message Passenger" />
+              <Btn cls="btn-message" icon={Icons.message} label="Message Passenger" onClick={() => trip.ride_id && onOpenChat?.(String(trip.ride_id), trip.passenger_profile_id)} />
               <Btn cls="btn-accept" icon={Icons.accept} label="Accept Request"
                 onClick={() => openModal({ type: 'accept', passengerName: trip.username ?? 'Passenger', bookingId: trip.id })} />
               <Btn cls="btn-cancel" icon={Icons.cancel} label="Deny Request"
@@ -709,6 +726,7 @@ const TripDetailsPanel: React.FC<{ trip: Trip; mode: 'user' | 'Driver'; onClose:
               passengers={passengers}
               isPast={true}
               onRatePassenger={(p) => openModal({ type: 'rating', target: { name: p.name, role: 'passenger' } })}
+              onMessage={(p) => trip.ride_id && onOpenChat?.(String(trip.ride_id), p.profileId)}
             />
             <div className="sheet-actions" style={{ marginTop: 12 }}>
               <Btn cls="btn-report" icon={Icons.report} label="Report Issue"
@@ -881,12 +899,23 @@ const TripSection: React.FC<TripSectionProps> = ({
 type ActivityPageProps = {
   canUseDriverMode: boolean;
   onDriverSignup: () => void;
+  onOpenChat?: (rideId: string, participantId?: string) => void;
+  onRideStarted?: () => void;
+  mode?: 'user' | 'Driver';
+  onModeChange?: (mode: 'user' | 'Driver') => void;
 };
-const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverSignup }) => {
-  const [mode, setMode] = useState<'user' | 'Driver'>('user');
+const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverSignup, onOpenChat, onRideStarted, mode, onModeChange }) => {
+  const [internalMode, setInternalMode] = useState<'user' | 'Driver'>('user');
+  const currentMode = mode ?? internalMode;
+  const setCurrentMode = (nextMode: 'user' | 'Driver') => {
+    if (mode === undefined) {
+      setInternalMode(nextMode);
+    }
+    onModeChange?.(nextMode);
+  };
   React.useEffect(() => {
-    if (!canUseDriverMode && mode === 'Driver') setMode('user');
-  }, [canUseDriverMode, mode]);
+    if (!canUseDriverMode && currentMode === 'Driver') setCurrentMode('user');
+  }, [canUseDriverMode, currentMode]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
 
   const [bookings, setBookings] = useState<Trip[]>([]);
@@ -931,7 +960,7 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
       };
 
 
-      if (mode === 'user') {
+  if (currentMode === 'user') {
         const data = await apiFetch<any>('bookings/me', { method: 'GET' });
 
         const transformed: Trip[] = data.map((b: any) => {
@@ -976,6 +1005,7 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
               .filter((b: any) => b.status === 'confirmed')
               .map((b: any) => ({
                 id: b.id,
+                profileId: b.passenger?.id ?? b.passenger_id,
                 name: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown',
                 rating: b.passenger?.rider_rating,
                 pickupLocation: b.pickup_location,
@@ -989,6 +1019,7 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
               finalDriverActivities.push({
                 id: b.id,
                 ride_id: ride.id,
+                passenger_profile_id: b.passenger?.id ?? b.passenger_id,
                 username: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown Passenger',
                 destination: b.dropoff_location,
                 time: formatTime(b.pickup_time || ride.departure_time),
@@ -1015,7 +1046,7 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
 
   React.useEffect(() => {
     fetchActivity();
-  }, [mode]);
+  }, [currentMode]);
 
   // Filter combined activity based on role and status
   const driverRequests = bookings.filter(b => b.status === 'passengerRequest');
@@ -1031,12 +1062,12 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
       <header className="uber-header">
         <h1 className="activity-title">Activity</h1>
         <div className="top-toggle">
-          <button className={`toggle-tab ${mode === 'user' ? 'toggle-tab-active' : ''}`} onClick={() => setMode('user')}>Rider</button>
+          <button className={`toggle-tab ${currentMode === 'user' ? 'toggle-tab-active' : ''}`} onClick={() => setCurrentMode('user')}>Rider</button>
           <button
-            className={`toggle-tab ${mode === 'Driver' ? 'toggle-tab-active' : ''}`}
+            className={`toggle-tab ${currentMode === 'Driver' ? 'toggle-tab-active' : ''}`}
             onClick={() => {
               if (!canUseDriverMode) return onDriverSignup();
-              setMode('Driver');
+              setCurrentMode('Driver');
             }}
           >
             Driver
@@ -1049,31 +1080,31 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
 
       {!loading && (
         <>
-          <TripSection title="Upcoming" trips={mode === 'user' ? riderUpcoming : driverUpcoming}
+          <TripSection title="Upcoming" trips={currentMode === 'user' ? riderUpcoming : driverUpcoming}
             emptyTitle="You have no upcoming trips" emptySubtitle="Reserve your trip →" emptyIcon="📅"
-            collapsible mode={mode} onTripMore={setSelectedTrip} />
+            collapsible mode={currentMode} onTripMore={setSelectedTrip} />
 
-          {mode === 'user' ? (
+          {currentMode === 'user' ? (
             <TripSection title="Requested" trips={riderRequested}
               emptyTitle="You have no requested trips" emptySubtitle="Book a reservation →" emptyIcon="🗓️"
-              collapsible mode={mode} onTripMore={setSelectedTrip} />
+              collapsible mode={currentMode} onTripMore={setSelectedTrip} />
           ) : (
             <TripSection title="Passenger Requests" trips={driverRequests}
               emptyTitle="You have no requests" emptySubtitle="Soon your ride will be booked" emptyIcon="🗓️"
-              collapsible mode={mode} onTripMore={setSelectedTrip} showFilter />
+              collapsible mode={currentMode} onTripMore={setSelectedTrip} showFilter />
           )}
 
-          <TripSection title="Past" trips={mode === 'user' ? riderPast : driverPast}
+          <TripSection title="Past" trips={currentMode === 'user' ? riderPast : driverPast}
             emptyTitle="No past trips yet" emptySubtitle="Your completed rides will appear here" emptyIcon="🕘"
-            collapsible mode={mode} onTripMore={setSelectedTrip} />
+            collapsible mode={currentMode} onTripMore={setSelectedTrip} />
         </>
       )}
 
       {selectedTrip && (
-        <TripDetailsPanel trip={selectedTrip} mode={mode} onClose={() => {
+        <TripDetailsPanel trip={selectedTrip} mode={currentMode} onClose={() => {
           setSelectedTrip(null);
           fetchActivity(); // Refresh after potentially accepting/denying
-        }} />
+        }} onOpenChat={onOpenChat} onRideStarted={onRideStarted} />
       )}
     </>
   );

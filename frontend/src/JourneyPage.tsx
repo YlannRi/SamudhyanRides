@@ -6,7 +6,7 @@ import { RideRenderMap } from './components/Map/RideRenderMap';
 
 
 // User Journey View
-const UserJourney: React.FC<{ trips: any[] }> = ({ trips }) => {
+const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, participantId?: string) => void }> = ({ trips, onOpenChat }) => {
   const [activeTripIdx, setActiveTripIdx] = useState(0);
 
   if (trips.length === 0) {
@@ -78,7 +78,7 @@ const UserJourney: React.FC<{ trips: any[] }> = ({ trips }) => {
 
       {/* Action */}
       <div className="journey-actions">
-        <button className="sheet-action-btn btn-message">
+        <button className="sheet-action-btn btn-message" onClick={() => trip.ride_id && onOpenChat?.(String(trip.ride_id))}>
           {Icons.message} Message Driver
         </button>
         <Btn cls="btn-report" icon={Icons.report} label="Report Issue" />
@@ -88,7 +88,7 @@ const UserJourney: React.FC<{ trips: any[] }> = ({ trips }) => {
 };
 
 // ─── Driver Journey View ───────────────────────────────────────
-const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => void }> = ({ rides, onComplete }) => {
+const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => void; onOpenChat?: (rideId: string, participantId?: string) => void }> = ({ rides, onComplete, onOpenChat }) => {
   const [activeRideIdx, setActiveRideIdx] = useState(0);
   const [currentPassIdx, setCurrentPassIdx] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -210,7 +210,10 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
       {/* Actions */}
       {currentPassenger && (
         <div className="journey-actions">
-          <button className="sheet-action-btn btn-message">
+          <button
+            className="sheet-action-btn btn-message"
+            onClick={() => onOpenChat?.(String(activeRide.id), currentPassenger.passenger?.id ?? currentPassenger.passenger_id)}
+          >
             {Icons.message} Message
           </button>
           {!isConfirmed ? (
@@ -242,12 +245,31 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
 };
 
 // ─── Main JourneyPage ──────────────────────────────────────────
-const JourneyPage: React.FC<{ canUseDriverMode: boolean; onDriverSignup: () => void }> = ({ canUseDriverMode, onDriverSignup }) => {
-  const [mode, setMode] = useState<'user' | 'driver'>('user');
+const JourneyPage: React.FC<{
+  canUseDriverMode: boolean;
+  onDriverSignup: () => void;
+  onOpenChat?: (rideId: string, participantId?: string) => void;
+  mode?: 'user' | 'driver';
+  onModeChange?: (mode: 'user' | 'driver') => void;
+}> = ({ canUseDriverMode, onDriverSignup, onOpenChat, mode, onModeChange }) => {
+  const [internalMode, setInternalMode] = useState<'user' | 'driver'>('user');
+  const currentMode = mode ?? internalMode;
+  const setCurrentMode = (nextMode: 'user' | 'driver') => {
+    if (mode === undefined) {
+      setInternalMode(nextMode);
+    }
+    onModeChange?.(nextMode);
+  };
 
   const [activeUserTrips, setActiveUserTrips] = useState<any[]>([]);
   const [activeDriverRides, setActiveDriverRides] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!canUseDriverMode && currentMode === 'driver') {
+      setCurrentMode('user');
+    }
+  }, [canUseDriverMode, currentMode]);
 
   const fetchActiveJourneys = async () => {
     setLoading(true);
@@ -287,7 +309,7 @@ const JourneyPage: React.FC<{ canUseDriverMode: boolean; onDriverSignup: () => v
 
   useEffect(() => {
     fetchActiveJourneys();
-  }, [mode]);
+  }, [currentMode]);
 
   // Handler for completing the ride
   const handleCompleteRide = async (rideId: number) => {
@@ -323,17 +345,17 @@ const JourneyPage: React.FC<{ canUseDriverMode: boolean; onDriverSignup: () => v
 
         <div className="top-toggle">
           <button
-            className={`toggle-tab ${mode === 'user' ? 'toggle-tab-active' : ''}`}
-            onClick={() => setMode('user')}
+            className={`toggle-tab ${currentMode === 'user' ? 'toggle-tab-active' : ''}`}
+            onClick={() => setCurrentMode('user')}
           >
             Rider
           </button>
 
           <button
-            className={`toggle-tab ${mode === 'driver' ? 'toggle-tab-active' : ''}`}
+            className={`toggle-tab ${currentMode === 'driver' ? 'toggle-tab-active' : ''}`}
             onClick={() => {
               if (!canUseDriverMode) return onDriverSignup();
-              setMode('driver');
+              setCurrentMode('driver');
             }}
           >
             Driver
@@ -344,10 +366,10 @@ const JourneyPage: React.FC<{ canUseDriverMode: boolean; onDriverSignup: () => v
       {loading ? (
         <p style={{ textAlign: 'center', marginTop: '40px', color: 'var(--text-secondary)' }}>Loading your journeys...</p>
       ) : (
-        mode === 'user' ? (
-          <UserJourney trips={activeUserTrips} />
+        currentMode === 'user' ? (
+          <UserJourney trips={activeUserTrips} onOpenChat={onOpenChat} />
         ) : (
-          <DriverJourney rides={activeDriverRides} onComplete={handleCompleteRide} />
+          <DriverJourney rides={activeDriverRides} onComplete={handleCompleteRide} onOpenChat={onOpenChat} />
         )
       )}
     </>

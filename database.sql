@@ -76,3 +76,48 @@ on public.user_profiles
 for update
 using ( auth.uid() = auth_user_id )
 with check ( auth.uid() = auth_user_id );
+
+
+-- ============================================================
+-- RIDE CHAT TABLES
+-- ============================================================
+
+-- One chat room per ride
+create table public.ride_chats (
+  id uuid primary key default gen_random_uuid(),
+  ride_id uuid not null,
+  passenger_id uuid not null,
+  created_at timestamptz not null default now()
+);
+
+-- Messages within a chat
+create table public.ride_messages (
+  id uuid primary key default gen_random_uuid(),
+  chat_id uuid not null references public.ride_chats(id) on delete cascade,
+  sender_id uuid not null,
+  message text not null,
+  created_at timestamptz not null default now(),
+  read boolean not null default false
+);
+
+create index idx_ride_messages_chat on public.ride_messages(chat_id);
+create index idx_ride_chats_ride on public.ride_chats(ride_id);
+create unique index idx_ride_chats_ride_passenger on public.ride_chats(ride_id, passenger_id);
+
+
+-- ============================================================
+-- NOTIFICATIONS TABLE
+-- ============================================================
+
+create table public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  type text not null default 'chat',
+  title text not null,
+  body text not null default '',
+  created_at timestamptz not null default now(),
+  read boolean not null default false,
+  link text
+);
+
+create index idx_notifications_user on public.notifications(user_id);
