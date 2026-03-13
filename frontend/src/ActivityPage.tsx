@@ -518,10 +518,11 @@ const TripDetailsPanel: React.FC<{
   onClose: () => void;
   onOpenChat?: (rideId: string, participantId?: string) => void;
   onRideStarted?: () => void;
-}> = ({ trip, onClose, onOpenChat, onRideStarted }) => {
+}> = ({ trip, onClose, onOpenChat, onRideStarted, mode }) => {
   const [closing, setClosing] = useState(false);
   const [modal, setModal] = useState<ModalState | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const [routeData, setRouteData] = useState<any>(null);
 
   const close = () => { setClosing(true); setTimeout(onClose, 320); };
   const openModal = (m: ModalState) => setModal(m);
@@ -596,7 +597,15 @@ const TripDetailsPanel: React.FC<{
               <DetailRow label="Driver" value={trip.drivername ?? 'Pending'} />
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
               <DetailRow label="Date & Arrival" value={trip.time ?? '—'} />
-              <DetailRow label="Estimated leave" value="Pending" />
+              {routeData?.times ? (
+                 <DetailRow label="Estimated Pickup" value={
+                    routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id))?.estimated_time 
+                    ? new Date(routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id)).estimated_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : "Pending"
+                 } />
+              ) : (
+                 <DetailRow label="Estimated Pickup" value="Pending" />
+              )}
               <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
             </div>
             <div className="sheet-actions">
@@ -622,6 +631,15 @@ const TripDetailsPanel: React.FC<{
               <DetailRow label="Driver" value={trip.drivername ?? 'Pending'} />
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
               <DetailRow label="Be There For" value={trip.time ?? '—'} />
+              {routeData?.times ? (
+                 <DetailRow label="Estimated Pickup" value={
+                    routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id))?.estimated_time 
+                    ? new Date(routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id)).estimated_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : "Pending"
+                 } />
+              ) : (
+                 <DetailRow label="Estimated Pickup" value="Pending" />
+              )}
               <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
             </div>
             <div className="sheet-actions">
@@ -646,7 +664,7 @@ const TripDetailsPanel: React.FC<{
               <DetailRow label="Driver" value={trip.drivername ?? '—'} />
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
               <DetailRow label="Pick Up Time" value={trip.time ?? '—'} />
-              <DetailRow label="Arrival Time" value="09:45" />
+              <DetailRow label="Arrival Time" value={routeData && routeData.times && routeData.times.arrival ? new Date(routeData.times.arrival).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'} />
               <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
               {trip.rating !== undefined && (
                 <DetailRow label="Your Rating" value={`⭐ ${trip.rating}`} />
@@ -675,8 +693,8 @@ const TripDetailsPanel: React.FC<{
           <>
             <div className="sheet-details-card">
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
-              <DetailRow label="Departure" value={trip.time ?? '—'} />
-              <DetailRow label="Est. Arrival" value="~09:45" />
+              <DetailRow label="Departure" value={routeData && routeData.times && routeData.times.driver_leave ? new Date(routeData.times.driver_leave).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (trip.time ?? '—')} />
+              <DetailRow label="Est. Arrival" value={routeData && routeData.times && routeData.times.arrival ? new Date(routeData.times.arrival).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'} />
             </div>
             <div className="passenger-section-label">
               Passengers <span className="passenger-count-badge">{passengers.length}</span>
@@ -739,8 +757,8 @@ const TripDetailsPanel: React.FC<{
           <>
             <div className="sheet-details-card">
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
-              <DetailRow label="Departure" value={trip.time ?? '—'} />
-              <DetailRow label="Arrival" value="~09:45" />
+              <DetailRow label="Departure" value={routeData && routeData.times && routeData.times.driver_leave ? new Date(routeData.times.driver_leave).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (trip.time ?? '—')} />
+              <DetailRow label="Arrival" value={routeData && routeData.times && routeData.times.arrival ? new Date(routeData.times.arrival).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'} />
             </div>
             <div className="passenger-section-label">
               Passengers: <span className="passenger-count-badge">{passengers.length}</span>
@@ -789,6 +807,8 @@ const TripDetailsPanel: React.FC<{
                 rideId={trip.ride_id}
                 height="220px"
                 interactive={true}
+                driverMode={mode === 'Driver'}
+                onRouteData={setRouteData}
                 existingPickup={
                   trip.pickup_lat && trip.pickup_lng
                     ? { lat: trip.pickup_lat, lng: trip.pickup_lng }

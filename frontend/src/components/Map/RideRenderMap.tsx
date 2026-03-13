@@ -7,11 +7,14 @@ import { apiFetch } from '../../lib/api';
 interface RideRenderMapProps {
   rideId: number;
   onPickupSelect?: (lat: number, lng: number) => void;
-  existingPickup?: { lat: number; lng: number };
+  existingPickup?: { lat: number; lng: number }; // For user creating ride
   height?: string;
   interactive?: boolean;
   /** Increment to force a refetch (e.g. driver confirms a pickup). */
   refreshTrigger?: number;
+  driverMode?: boolean;
+  confirmedPickupIds?: number[];
+  onRouteData?: (data: any) => void;
 }
 
 /**
@@ -25,8 +28,12 @@ export const RideRenderMap: React.FC<RideRenderMapProps> = ({
   height = '300px',
   interactive = true,
   refreshTrigger = 0,
+  driverMode = false,
+  confirmedPickupIds = [],
+  onRouteData,
 }) => {
   const [geoJsonData, setGeoJsonData] = useState<any>(null);
+  const [timesData, setTimesData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPickup, setSelectedPickup] = useState<LatLngExpression | null>(null);
@@ -40,7 +47,15 @@ export const RideRenderMap: React.FC<RideRenderMapProps> = ({
 
       try {
         const data = await apiFetch<any>(`/routing/ride/${rideId}`, { method: 'GET' });
-        if (isMounted) setGeoJsonData(data);
+        if (isMounted) {
+          if (data.route) {
+            setGeoJsonData(data.route);
+            setTimesData(data.times);
+          } else {
+            setGeoJsonData(data); // Fallback to raw geojson
+          }
+          if (onRouteData) onRouteData(data);
+        }
       } catch (err: unknown) {
         console.error('Error fetching map route:', err);
         const msg = err instanceof Error ? err.message : String(err);
@@ -160,6 +175,22 @@ export const RideRenderMap: React.FC<RideRenderMapProps> = ({
         {selectedPickup && <Marker position={selectedPickup} />}
 
         {existingPickup && <Marker position={[existingPickup.lat, existingPickup.lng]} />}
+        
+        {timesData && timesData.pickups && timesData.pickups.map((p: any, idx: number) => {
+           // For user mode, we don't render all pickups, we only render existingPickup.
+           // However, if we're rendering existingPickup as a normal pin, we might not need this.
+           // User mode: Only show if it matches existingPickup. Wait, we ONLY show passenger their own marker in Journey/Activity via existingPickup prop! So we can just skip rendering here for users.
+           
+           if (!driverMode) return null;
+           
+           // Driver Mode: filter out if all booking_ids for this coordinate are in confirmedPickupIds
+           if (p.booking_ids && p.booking_ids.length > 0) {
+             const allConfirmed = p.booking_ids.every((id: number) => confirmedPickupIds.includes(id));
+             if (allConfirmed) return null; // Don't show this marker anymore
+           }
+           
+           return <Marker key={idx} position={[p.lat, p.lng]} />;
+        })}
 
         {interactive && <MapClickEvent />}
       </MapContainer>

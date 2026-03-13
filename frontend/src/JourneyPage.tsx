@@ -8,6 +8,7 @@ import { RideRenderMap } from './components/Map/RideRenderMap';
 // User Journey View
 const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, participantId?: string) => void }> = ({ trips, onOpenChat }) => {
   const [activeTripIdx, setActiveTripIdx] = useState(0);
+  const [routeData, setRouteData] = useState<any>(null);
 
   if (trips.length === 0) {
     return (
@@ -25,8 +26,18 @@ const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, partic
   const driverName = driver.first_name ? `${driver.first_name} ${driver.last_name}` : 'Unknown Driver';
   // Format departure time
   const departureDate = new Date(ride.departure_time || trip.pickup_time);
-  const timeOfArrival = isNaN(departureDate.getTime()) ? 'Pending' : departureDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
+  let timeOfArrival = isNaN(departureDate.getTime()) ? 'Pending' : departureDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  // Try to use calculated pickup time if routeData is available
+  if (routeData && routeData.times && routeData.times.pickups) {
+      const myPickup = routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id));
+      if (myPickup && myPickup.estimated_time) {
+          const dt = new Date(myPickup.estimated_time);
+          if (!isNaN(dt.getTime())) {
+              timeOfArrival = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          }
+      }
+  }
 
   return (
     <div className="journey-content">
@@ -60,7 +71,17 @@ const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, partic
 
       {/* Map */}
       <div style={{ marginBottom: '16px' }}>
-        <RideRenderMap rideId={trip.ride_id} height="300px" interactive={true} />
+        <RideRenderMap 
+          rideId={trip.ride_id} 
+          height="300px" 
+          interactive={true} 
+          onRouteData={setRouteData}
+          existingPickup={
+            trip.pickup_lat && trip.pickup_lng
+              ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
+              : undefined
+          }
+        />
       </div>
 
       {/* Pickup code */}
@@ -74,7 +95,7 @@ const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, partic
         <DetailRow label="Destination" value={trip.dropoff_location || ride.destination || '—'} />
         <DetailRow label="Vehicle" value={trip.vehicle?.car_model ?? "Unknown Vehicle"} />
         <DetailRow label="Numberplate" value={trip.vehicle?.number_plate ?? "Not available"} />
-        <DetailRow label="Departure Time" value={timeOfArrival} />
+        <DetailRow label={routeData ? "Estimated Pickup" : "Departure Time"} value={timeOfArrival} />
         <DetailRow label="Cost" value={`£2.00`} valueClass="detail-price" />
       </div>
 
@@ -96,6 +117,7 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [confirmedPickups, setConfirmedPickups] = useState<Set<number>>(new Set());
   const [isCompleting, setIsCompleting] = useState(false);
+  const [routeData, setRouteData] = useState<any>(null);
 
   if (rides.length === 0) {
     return (
@@ -148,6 +170,12 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
       {/* Header */}
       <div className="journey-driver-mode-header">
         <div className="journey-mode-sub">Pick Up Order</div>
+        {routeData && routeData.times && routeData.times.driver_leave && (
+           <div className="journey-arriving-badge" style={{marginTop: '8px', display: 'inline-flex'}}>
+             {Icons.clock}
+             <span>Leave By {new Date(routeData.times.driver_leave).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+           </div>
+        )}
       </div>
 
       {/* Passenger tabs */}
@@ -176,7 +204,15 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
 
       {/* Map */}
       <div style={{ marginBottom: '16px' }}>
-        <RideRenderMap rideId={activeRide.id} height="300px" interactive={true} refreshTrigger={refreshTrigger} />
+        <RideRenderMap 
+           rideId={activeRide.id} 
+           height="300px" 
+           interactive={true} 
+           refreshTrigger={refreshTrigger} 
+           driverMode={true}
+           confirmedPickupIds={Array.from(confirmedPickups)}
+           onRouteData={setRouteData}
+        />
       </div>
 
       {/* Passenger card */}

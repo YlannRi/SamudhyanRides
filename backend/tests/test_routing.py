@@ -120,7 +120,7 @@ class TestGetRideRoute:
             "destination_lat": 51.5,
             "destination_lng": -2.5
         }
-        fake_booking = {"pickup_lat": 51.2, "pickup_lng": -2.2}
+        fake_booking = {"id": 1, "pickup_lat": 51.2, "pickup_lng": -2.2}
         fake_response = {"routes": []}
 
         with patch("app.routers.routing.supabase") as mock_sb:
@@ -146,3 +146,56 @@ class TestGetRideRoute:
 
         assert response.status_code == 200
         mock_optimize.assert_called_once()
+
+    def test_gets_ride_route_with_pickups_and_times(self, client):
+        fake_ride = {
+            "origin_lat": 51.0,
+            "origin_lng": -2.0,
+            "destination_lat": 51.5,
+            "destination_lng": -2.5,
+            "departure_time": "2026-03-14T10:00:00Z"
+        }
+        fake_booking = {"id": 1, "pickup_lat": 51.2, "pickup_lng": -2.2}
+        
+        fake_response = {
+            "features": [{
+                "properties": {
+                    "summary": {"duration": 1800},
+                    "segments": [
+                        {"duration": 600},
+                        {"duration": 1200}
+                    ]
+                }
+            }]
+        }
+
+        from app.pathfinder.models import Coordinate
+        ordered_wps = [
+            Coordinate(longitude=-2.0, latitude=51.0),
+            Coordinate(longitude=-2.2, latitude=51.2),
+            Coordinate(longitude=-2.5, latitude=51.5)
+        ]
+
+        with patch("app.routers.routing.supabase") as mock_sb:
+            def fake_table(name):
+                t_mock = MagicMock()
+                if name == "rides":
+                    t_mock.select.return_value.eq.return_value.execute.return_value.data = [fake_ride]
+                elif name == "bookings":
+                    t_mock.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [fake_booking]
+                return t_mock
+
+            mock_sb.table.side_effect = fake_table
+
+            with patch("app.routers.routing.optimize_route", return_value=ordered_wps), \
+                 patch("app.routers.routing.calculate_route", return_value=fake_response):
+                
+                response = client.get("/routing/ride/ride-1")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "times" in data
+        assert data["times"]["driver_leave"] == "2026-03-14T09:30:00+00:00"
+        assert len(data["times"]["pickups"]) == 1
+        assert data["times"]["pickups"][0]["estimated_time"] == "2026-03-14T09:40:00+00:00"
+        assert data["times"]["pickups"][0]["booking_ids"] == [1]

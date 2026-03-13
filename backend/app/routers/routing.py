@@ -38,7 +38,7 @@ async def get_ride_route(ride_id: str):
     """
     # 1. Fetch the ride
     result = supabase.table("rides").select(
-        "origin_lat, origin_lng, destination_lat, destination_lng"
+        "origin_lat, origin_lng, destination_lat, destination_lng, departure_time"
     ).eq("id", ride_id).execute()
 
     if not result.data:
@@ -55,12 +55,17 @@ async def get_ride_route(ride_id: str):
 
     # 2. Fetch confirmed bookings for this ride
     bookings_res = supabase.table("bookings").select(
-        "pickup_lat, pickup_lng"
+        "id, pickup_lat, pickup_lng"
     ).eq("ride_id", ride_id).eq("status", "confirmed").execute()
 
     pickups = []
+    coord_to_bookings = {}
     for b in bookings_res.data:
         if b["pickup_lat"] and b["pickup_lng"]:
+            coord = (b["pickup_lng"], b["pickup_lat"])
+            if coord not in coord_to_bookings:
+                coord_to_bookings[coord] = []
+            coord_to_bookings[coord].append(b["id"])
             pickups.append(Coordinate(longitude=b["pickup_lng"], latitude=b["pickup_lat"]))
 
     # 3. Determine the waypoints
@@ -72,4 +77,58 @@ async def get_ride_route(ride_id: str):
         ordered_waypoints = [origin, destination]
 
     # 4. Calculate final GeoJSON route
-    return calculate_route(RouteRequest(coordinates=ordered_waypoints))
+    route_json = calculate_route(RouteRequest(coordinates=ordered_waypoints))
+
+    # 5. Calculate estimated times
+    from datetime import datetime, timedelta
+    
+    departure_time_str = ride.get("departure_time")
+    arrival_time = None
+    if departure_time_str:
+        # Handle 'Z' suffix since fromisoformat doesn't always support it nicely across python versions, though 3.11+ does
+        departure_time_str = departure_time_str.replace("Z", "+00:00")
+        try:
+            arrival_time = datetime.fromisoformat(departure_time_str)
+        except ValueError:
+            pass
+            
+    times = {
+        "driver_leave": None,
+        "arrival": ride.get("departure_time"),
+        "pickups": []
+    }
+    
+    if arrival_time and "features" in route_json and len(route_json["features"]) > 0:
+        properties = route_json["features"][0].get("properties", {})
+        summary = properties.get("summary", {})
+        total_duration_sec = summary.get("duration", 0)
+        
+        driver_leave = arrival_time - timedelta(seconds=total_duration_sec)
+        times["driver_leave"] = driver_leave.isoformat()
+        
+        segments = properties.get("segments", [])
+        current_time = driver_leave
+        
+        # Iterate through segments up to the second to last segment (since the last segment is the destination)
+        for i in range(len(segments) - 1):
+            segment_duration = segments[i].get("duration", 0)
+            current_time += timedelta(seconds=segment_duration)
+            
+            # The waypoint reached at the end of this segment is ordered_waypoints[i+1]
+            wp = ordered_waypoints[i+1]
+            
+            # Find matching bookings by coordinate
+            coord_key = (wp.longitude, wp.latitude)
+            booking_ids = coord_to_bookings.get(coord_key, [])
+            
+            times["pickups"].append({
+                "lat": wp.latitude,
+                "lng": wp.longitude,
+                "estimated_time": current_time.isoformat(),
+                "booking_ids": booking_ids
+            })
+
+    return {
+        "route": route_json,
+        "times": times
+    }
