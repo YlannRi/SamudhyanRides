@@ -20,7 +20,6 @@ const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, partic
   }
 
   const trip = trips[activeTripIdx];
-  console.log("Rendering trip", trip);
   const ride = trip.ride || {};
   const driver = ride.driver || {};
   const driverName = driver.first_name ? `${driver.first_name} ${driver.last_name}` : 'Unknown Driver';
