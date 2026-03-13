@@ -72,7 +72,7 @@ class TestGeocodeAddress:
         mock_resp.json.return_value = {
             "features": [
                 {
-                    "properties": {"label": "Bath Spa Station"},
+                    "properties": {"label": "Bath Spa Station", "country_a": "GBR"},
                     "geometry": {"coordinates": [-2.36, 51.37]}
                 }
             ]

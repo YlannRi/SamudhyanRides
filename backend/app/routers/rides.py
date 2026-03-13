@@ -151,8 +151,30 @@ def search_rides(
     if min_seats:
         query = query.gte("seats_available", min_seats)
 
-    response = query.execute()
-    return response.data
+    rides = query.execute().data
+
+    if not rides:
+        return []
+
+    # Fetch driver profiles and attach name + rating to each ride
+    driver_ids = list(set(r["driver_id"] for r in rides))
+    profiles_res = supabase.table("user_profiles") \
+        .select("id, first_name, last_name, driver_rating") \
+        .in_("id", driver_ids) \
+        .execute()
+
+    profiles_by_id = {p["id"]: p for p in profiles_res.data}
+
+    for ride in rides:
+        driver = profiles_by_id.get(ride["driver_id"])
+        if driver:
+            ride["driver_name"] = f"{driver['first_name']} {driver['last_name']}"
+            ride["driver_rating"] = float(driver.get("driver_rating") or 0)
+        else:
+            ride["driver_name"] = None
+            ride["driver_rating"] = 0.0
+
+    return rides
 
 # GET RIDE DETAILS
 @router.get("/{rides_id}")
