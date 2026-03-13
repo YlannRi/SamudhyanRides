@@ -841,7 +841,8 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
                 id: b.id, ride_id: ride.id, passenger_profile_id: b.passenger?.id ?? b.passenger_id,
                 username: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown Passenger', destination: b.dropoff_location,
                 time: formatTime(b.pickup_time || ride.departure_time), dateOnly: formatDateOnly(b.pickup_time || ride.departure_time), timeOnly: formatTimeOnly(b.pickup_time || ride.departure_time),
-                price: `£2.00`, status: 'passengerRequest', action: 'More', pickup_lat: b.pickup_lat, pickup_lng: b.pickup_lng
+                price: `£2.00`, status: 'passengerRequest', action: 'More', pickup_lat: b.pickup_lat, pickup_lng: b.pickup_lng,
+                rating: b.passenger?.rider_rating && b.passenger.rider_rating > 0 ? b.passenger.rider_rating : undefined
               });
             }
           });
