@@ -3,7 +3,7 @@ import { apiFetch } from './lib/api';
 import { RideRenderMap } from './components/Map/RideRenderMap';
 
 export type RequestRidePrefill = { destination?: string; arrivalDateTimeLocal?: string; };
-type Ride = { id: number; origin?: string; destination?: string; departure_time?: string; dateOnly?: string; timeOnly?: string; driverName?: string; price?: string; };
+type Ride = { id: number; origin?: string; destination?: string; departure_time?: string; dateOnly?: string; timeOnly?: string; driver_name?: string;driver_rating?: number; price?: string; };
 
 const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }) => {
   const [rides, setRides] = useState<Ride[]>([]);
@@ -112,7 +112,10 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
                   <div className="trip-row-meta">{formatDateOnly(ride.departure_time)}</div>
                   {ride.departure_time && <div className="trip-row-meta">{formatTimeOnly(ride.departure_time)}</div>}
                   <div className="trip-row-meta">From: {ride.origin || '—'}</div>
-                  {ride.driverName && <div className="trip-row-meta">Driver: {ride.driverName}</div>}
+                  {ride.driver_name && <div className="trip-row-meta">Driver: {ride.driver_name}</div>}
+                  {ride.driver_rating !== undefined && ride.driver_rating > 0 && (
+                    <div className="trip-row-meta">⭐ {ride.driver_rating.toFixed(1)}</div>
+                  )}
                   <div className="trip-row-price" style={{ color: 'var(--text-label)', fontWeight: 'bold' }}>{'£2.00'}</div>
                 </div>
               </div>

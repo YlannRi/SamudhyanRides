@@ -55,10 +55,14 @@ class TestDriverDashboard:
 
     def test_returns_empty_when_no_rides(self, client):
         with patch("app.routers.rides.supabase") as mock_sb:
-            # get_profile_id call
-            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
-            # rides query returns nothing
-            mock_sb.table.return_value.select.return_value.eq.return_value.neq.return_value.neq.return_value.execute.return_value.data = []
+            def fake_table(name):
+                tm = MagicMock()
+                if name == "user_profiles":
+                    tm.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+                elif name == "rides":
+                    tm.select.return_value.eq.return_value.neq.return_value.execute.return_value.data = []
+                return tm
+            mock_sb.table.side_effect = fake_table
 
             response = client.get("/rides/driver/dashboard")
 
@@ -70,21 +74,16 @@ class TestDriverDashboard:
         fake_ride = {"id": "ride-1", "origin": "Bath", "destination": "Bristol"}
 
         with patch("app.routers.rides.supabase") as mock_sb:
-            # Chain: get_profile_id → profile row
-            profile_mock = MagicMock()
-            profile_mock.data = [{"id": FAKE_PROFILE_ID}]
-
-            rides_mock = MagicMock()
-            rides_mock.data = [fake_ride]
-
-            bookings_mock = MagicMock()
-            bookings_mock.data = []
-
-            # We need sequential calls to return different things.
-            # Use side_effect on execute() to return in order.
-            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value = profile_mock
-            mock_sb.table.return_value.select.return_value.eq.return_value.neq.return_value.neq.return_value.execute.return_value = rides_mock
-            mock_sb.table.return_value.select.return_value.in_.return_value.execute.return_value = bookings_mock
+            def fake_table(name):
+                tm = MagicMock()
+                if name == "user_profiles":
+                    tm.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+                elif name == "rides":
+                    tm.select.return_value.eq.return_value.neq.return_value.execute.return_value.data = [fake_ride]
+                elif name == "bookings":
+                    tm.select.return_value.in_.return_value.execute.return_value.data = []
+                return tm
+            mock_sb.table.side_effect = fake_table
 
             response = client.get("/rides/driver/dashboard")
 
@@ -93,31 +92,21 @@ class TestDriverDashboard:
 
     def test_returns_rides_with_bookings_and_passengers(self, client):
         fake_ride = {"id": "ride-1", "origin": "Bath", "destination": "Bristol"}
-        fake_booking = {"id": "book-1", "ride_id": "ride-1", "passenger_id": "pass-1"}
-        fake_profile = {"id": "pass-1", "first_name": "Alice"}
+        fake_booking = {"id": "book-1", "ride_id": "ride-1", "passenger_id": "pass-1", "status": "confirmed"}
+        fake_profile = {"id": "pass-1", "first_name": "Alice", "last_name": "Smith",
+                        "university_username": "as123", "driver_rating": 0.0, "rider_rating": 4.5}
 
         with patch("app.routers.rides.supabase") as mock_sb:
-            mock_sb_execute = MagicMock()
-            mock_sb_execute.execute.side_effect = [
-                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),
-                MagicMock(data=[fake_ride]),
-                MagicMock(data=[fake_booking]),
-                MagicMock(data=[fake_profile]),
-            ]
-
             def fake_table(name):
                 tm = MagicMock()
                 if name == "user_profiles":
-                    # First time: eq (for get_profile_id), Second time: in_ (for passengers)
-                    # We can map them all to one MagicMock since we rely on `side_effect`
-                    tm.select.return_value.eq.return_value = mock_sb_execute
-                    tm.select.return_value.in_.return_value = mock_sb_execute
+                    tm.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+                    tm.select.return_value.in_.return_value.execute.return_value.data = [fake_profile]
                 elif name == "rides":
-                    tm.select.return_value.eq.return_value.neq.return_value.neq.return_value = mock_sb_execute
+                    tm.select.return_value.eq.return_value.neq.return_value.execute.return_value.data = [fake_ride]
                 elif name == "bookings":
-                    tm.select.return_value.in_.return_value = mock_sb_execute
+                    tm.select.return_value.in_.return_value.execute.return_value.data = [fake_booking]
                 return tm
-            
             mock_sb.table.side_effect = fake_table
 
             response = client.get("/rides/driver/dashboard")
@@ -127,7 +116,6 @@ class TestDriverDashboard:
         assert len(rides) == 1
         assert len(rides[0]["bookings"]) == 1
         assert rides[0]["bookings"][0]["passenger"]["first_name"] == "Alice"
-
 
 # ---------------------------------------------------------------------------
 # POST /rides/
@@ -181,32 +169,53 @@ class TestSearchRides:
 
     def test_returns_all_open_rides(self, client):
         fake_rides = [
-            {"id": "r1", "origin": "Bath", "destination": "Bristol", "status": "open"},
-            {"id": "r2", "origin": "Bath", "destination": "London", "status": "open"},
+            {"id": "r1", "origin": "Bath", "destination": "Bristol", "status": "open", "driver_id": "drv-1"},
+            {"id": "r2", "origin": "Bath", "destination": "London", "status": "open", "driver_id": "drv-2"},
+        ]
+        fake_driver_profiles = [
+            {"id": "drv-1", "first_name": "Alice", "last_name": "A", "driver_rating": 4.5},
+            {"id": "drv-2", "first_name": "Bob", "last_name": "B", "driver_rating": 0.0},
         ]
 
         with patch("app.routers.rides.supabase") as mock_sb:
-            # get_profile_id
-            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
-            # search query result
-            mock_sb.table.return_value.select.return_value.eq.return_value.neq.return_value.execute.return_value.data = fake_rides
+            def fake_table(name):
+                tm = MagicMock()
+                if name == "user_profiles":
+                    # get_profile_id: eq chain
+                    tm.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+                    # driver profiles: in_ chain
+                    tm.select.return_value.in_.return_value.execute.return_value.data = fake_driver_profiles
+                elif name == "rides":
+                    tm.select.return_value.eq.return_value.neq.return_value.execute.return_value.data = fake_rides
+                return tm
+            mock_sb.table.side_effect = fake_table
 
             response = client.get("/rides/")
 
         assert response.status_code == 200
-        assert len(response.json()) == 2
+        data = response.json()
+        assert len(data) == 2
+        assert data[0]["driver_name"] == "Alice A"
+        assert data[0]["driver_rating"] == 4.5
 
     def test_returns_filtered_rides(self, client):
-        fake_rides = [{"id": "r1", "origin": "Bath", "destination": "Bristol", "status": "open"}]
+        fake_rides = [{"id": "r1", "origin": "Bath", "destination": "Bristol", "status": "open", "driver_id": "drv-1"}]
+        fake_driver_profiles = [{"id": "drv-1", "first_name": "Alice", "last_name": "A", "driver_rating": 4.5}]
+
         with patch("app.routers.rides.supabase") as mock_sb:
-            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
-            # the query will have multiple chain links, let's mock the final execute
-            mock_query = MagicMock()
-            mock_query.execute.return_value.data = fake_rides
-            mock_query.ilike.return_value = mock_query
-            mock_query.gte.return_value = mock_query
-            
-            mock_sb.table.return_value.select.return_value.eq.return_value.neq.return_value = mock_query
+            def fake_table(name):
+                tm = MagicMock()
+                if name == "user_profiles":
+                    tm.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+                    tm.select.return_value.in_.return_value.execute.return_value.data = fake_driver_profiles
+                elif name == "rides":
+                    mock_query = MagicMock()
+                    mock_query.execute.return_value.data = fake_rides
+                    mock_query.ilike.return_value = mock_query
+                    mock_query.gte.return_value = mock_query
+                    tm.select.return_value.eq.return_value.neq.return_value = mock_query
+                return tm
+            mock_sb.table.side_effect = fake_table
 
             response = client.get("/rides/", params={"origin": "Ba", "destination": "Bris", "min_seats": 2})
 
@@ -215,14 +224,46 @@ class TestSearchRides:
 
     def test_returns_empty_when_no_rides(self, client):
         with patch("app.routers.rides.supabase") as mock_sb:
-            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
-            mock_sb.table.return_value.select.return_value.eq.return_value.neq.return_value.execute.return_value.data = []
+            def fake_table(name):
+                tm = MagicMock()
+                if name == "user_profiles":
+                    tm.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+                elif name == "rides":
+                    tm.select.return_value.eq.return_value.neq.return_value.execute.return_value.data = []
+                return tm
+            mock_sb.table.side_effect = fake_table
 
             response = client.get("/rides/")
 
         assert response.status_code == 200
         assert response.json() == []
 
+    def test_returns_ride_with_missing_driver_profile(self, client):
+        fake_rides = [{"id": "r1", "origin": "Bath", "destination": "Bristol", "status": "open", "driver_id": "drv-1"}]
+        fake_driver_profiles = []
+
+        with patch("app.routers.rides.supabase") as mock_sb:
+            def fake_table(name):
+                tm = MagicMock()
+                if name == "user_profiles":
+                    tm.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+                    tm.select.return_value.in_.return_value.execute.return_value.data = fake_driver_profiles
+                elif name == "rides":
+                    mock_query = MagicMock()
+                    mock_query.execute.return_value.data = fake_rides
+                    mock_query.ilike.return_value = mock_query
+                    mock_query.gte.return_value = mock_query
+                    tm.select.return_value.eq.return_value.neq.return_value = mock_query
+                return tm
+            mock_sb.table.side_effect = fake_table
+
+            response = client.get("/rides/", params={"origin": "Ba"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["driver_name"] is None
+        assert data[0]["driver_rating"] == 0.0
 
 # ---------------------------------------------------------------------------
 # GET /rides/{ride_id}

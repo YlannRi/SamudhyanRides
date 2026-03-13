@@ -300,9 +300,41 @@ class TestGetMyBookings:
         assert response.json()[0]["ride"]["driver"]["first_name"] == "Test"
 
 
+class TestGetVehicleInfo:
+    def test_get_vehicle_info_success(self, client):
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{"driver_id": "driver-abc"}]),
+                MagicMock(data=[{"car_model": "Toyota Yaris", "number_plate": "AB12 CDE"}])
+            ]
+            response = client.get("/bookings/rides/ride-1/vehicle")
+        
+        assert response.status_code == 200
+        assert response.json()["car_model"] == "Toyota Yaris"
+
+    def test_get_vehicle_info_ride_not_found(self, client):
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+            response = client.get("/bookings/rides/ride-1/vehicle")
+        
+        assert response.status_code == 404
+        assert "Ride not found" in response.json()["detail"]
+
+    def test_get_vehicle_info_verification_not_found(self, client):
+        with patch("app.routers.bookings.supabase") as mock_sb:
+            mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{"driver_id": "driver-abc"}]),
+                MagicMock(data=[])
+            ]
+            response = client.get("/bookings/rides/ride-1/vehicle")
+        
+        assert response.status_code == 404
+        assert "Vehicle info not found" in response.json()["detail"]
+
 # ---------------------------------------------------------------------------
 # POST /bookings/bookings/{booking_id}/confirm-pickup
 # ---------------------------------------------------------------------------
+
 
 class TestConfirmPickup:
 

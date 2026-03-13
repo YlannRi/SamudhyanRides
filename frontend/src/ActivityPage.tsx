@@ -11,6 +11,7 @@ type Trip = {
   id: number;
   ride_id?: number;
   passenger_profile_id?: string;
+  driver_profile_id?: string;   // profile id of the driver (for passenger rating)
   destination?: string;
   username?: string;
   drivername?: string;
@@ -19,7 +20,7 @@ type Trip = {
   timeOnly?: string;
   price?: string;
   numberPassengers?: number;
-  rating?: number;
+  rating?: number;              // existing rating given TO this trip (if rated already)
   action: 'More';
   status?: 'upcomingDriver' | 'upcomingUser' | 'requested' | 'pastUser' | 'passengerRequest' | 'pastDriver' | 'activeUser' | 'activeDriver' | 'cancelled';
   numberplate?: string;
@@ -27,6 +28,7 @@ type Trip = {
   pickup_lat?: number;
   pickup_lng?: number;
   passengers?: any[];
+  rider_rating?: number;        // passenger's rider rating (for driver's passenger request view)
 };
 
 const RATING_LABELS: Record<number, string> = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Great', 5: 'Excellent' };
@@ -138,7 +140,7 @@ const ConfirmUI: React.FC<{
 
 // Master modal shell
 type ModalState =
-  | { type: 'rating'; target: { name: string; role: 'driver' | 'passenger' } }
+  | { type: 'rating'; rideId: number; reviewedUserId: string; target: { name: string; role: 'driver' | 'passenger' } }
   | { type: 'report' }
   | { type: 'cancel'; title: string; body: string; actionType: 'cancelBooking' | 'cancelRide'; targetId: number }
   | { type: 'accept'; passengerName: string; bookingId: number }
@@ -166,15 +168,23 @@ const Modal: React.FC<{
 
   const modalTitle = (() => {
     switch (inner.type) {
-      case 'rating': return 'How was your trip?';
-      case 'report': return 'Report an Issue';
+      case 'rating':
+        return 'How was your trip?';
+      case 'report':
+        return 'Report an Issue';
       case 'cancel':
-      case 'start': return inner.title;
-      case 'accept': return `Accept ${inner.passengerName}?`;
-      case 'deny': return `Deny ${inner.passengerName}?`;
-      case 'remove': return `Remove ${inner.passengerName}?`;
-      case 'success': return inner.title;
-      default: return 'Dialog';
+      case 'start':
+        return inner.title;
+      case 'accept':
+        return `Accept ${inner.passengerName}?`;
+      case 'deny':
+        return `Deny ${inner.passengerName}?`;
+      case 'remove':
+        return `Remove ${inner.passengerName}?`;
+      case 'success':
+        return inner.title;
+      default:
+        return 'Dialog';
     }
   })();
 
@@ -194,8 +204,15 @@ const Modal: React.FC<{
   }, [isSuccess, onClose]);
 
   const srOnly: React.CSSProperties = {
-    position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
-    overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0,
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    padding: 0,
+    margin: -1,
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    border: 0,
   };
 
   return (
@@ -219,7 +236,25 @@ const Modal: React.FC<{
             <div className="rating-success-sub">{inner.sub}</div>
           </div>
         ) : inner.type === 'rating' ? (
-          <RatingUI target={inner.target} onSubmit={() => succeed('⭐', 'Rating Submitted!', 'Thanks for your feedback')} onClose={onClose} />
+          <RatingUI target={inner.target} onSubmit={async (stars) => {
+              try {
+                const params = new URLSearchParams({
+                  ride_id: String(inner.rideId),
+                  reviewed_user_id: inner.reviewedUserId,
+                  rating: String(stars),
+                });
+                await apiFetch(`ratings/?${params.toString()}`, { method: 'POST' });
+                succeed('⭐', 'Rating Submitted!', 'Thanks for your feedback');
+              } catch (err: any) {
+                // Still show success on duplicate (already rated) to avoid confusion
+                const status = err?.status ?? err?.response?.status;
+                if (status === 409) {
+                  succeed('⭐', 'Already Rated', 'You have already rated this person for this ride');
+                } else {
+                  succeed('⚠️', 'Could not submit', err?.message || 'Something went wrong');
+                }
+              }
+            }} onClose={onClose} />
         ) : inner.type === 'report' ? (
           <ReportUI onSubmit={() => succeed('✅', 'Report Sent', 'Thanks for letting us know — we\'ll look into it')} onClose={onClose} />
         ) : inner.type === 'cancel' ? (
@@ -280,8 +315,15 @@ const Modal: React.FC<{
 
 // Passenger Carousel
 type Passenger = {
-  id: number; profileId?: string; name: string; rating?: number;
-  pickupLocation?: string; cost?: string; rated?: boolean; triprated?: number;
+  id: number;
+  profileId?: string;
+  rideId?: number;
+  name: string;
+  rating?: number;
+  pickupLocation?: string;
+  cost?: string;
+  rated?: boolean;
+  triprated?: number;
 };
 
 const PassengerCarousel: React.FC<{
@@ -464,8 +506,14 @@ const TripDetailsPanel: React.FC<{
             </div>
             <div className="sheet-actions">
               <Btn cls="btn-message" icon={Icons.message} label="Message Driver" onClick={() => trip.ride_id && onOpenChat?.(String(trip.ride_id))} />
-              {trip.rating === undefined && (
-                <Btn cls="btn-rate" icon={Icons.star} label="Rate Trip" onClick={() => openModal({ type: 'rating', target: { name: trip.drivername ?? 'Your Driver', role: 'driver' } })} />
+              {trip.rating === undefined && trip.driver_profile_id && trip.ride_id && (
+                <Btn cls="btn-rate" icon={Icons.star} label="Rate Trip"
+                  onClick={() => openModal({
+                    type: 'rating',
+                    rideId: trip.ride_id!,
+                    reviewedUserId: trip.driver_profile_id!,
+                    target: { name: trip.drivername ?? 'Your Driver', role: 'driver' }
+                  })} />
               )}
               <Btn cls="btn-report" icon={Icons.report} label="Report Issue" onClick={() => openModal({ type: 'report' })} />
             </div>
@@ -517,8 +565,20 @@ const TripDetailsPanel: React.FC<{
               <DetailRow label="Departure" value={trip.time ?? '—'} />
               <DetailRow label="Arrival" value="~09:45" />
             </div>
-            <div className="passenger-section-label">Passengers: <span className="passenger-count-badge">{passengers.length}</span></div>
-            <PassengerCarousel passengers={passengers} isPast={true} onRatePassenger={(p) => openModal({ type: 'rating', target: { name: p.name, role: 'passenger' } })} onMessage={(p) => trip.ride_id && onOpenChat?.(String(trip.ride_id), p.profileId)} />
+            <div className="passenger-section-label">
+              Passengers: <span className="passenger-count-badge">{passengers.length}</span>
+            </div>
+            <PassengerCarousel
+              passengers={passengers}
+              isPast={true}
+              onRatePassenger={(p) => p.profileId && trip.ride_id && openModal({
+                type: 'rating',
+                rideId: trip.ride_id,
+                reviewedUserId: p.profileId,
+                target: { name: p.name, role: 'passenger' }
+              })}
+              onMessage={(p) => trip.ride_id && onOpenChat?.(String(trip.ride_id), p.profileId)}
+            />
             <div className="sheet-actions" style={{ marginTop: 12 }}>
               <Btn cls="btn-report" icon={Icons.report} label="Report Issue" onClick={() => openModal({ type: 'report' })} />
             </div>
@@ -621,7 +681,7 @@ const TripSection: React.FC<TripSectionProps> = ({
                     </div>
                     <div className="trip-row-meta">{trip.dateOnly ?? trip.time}</div>
                     {trip.drivername && <div className="trip-row-meta">{trip.drivername}</div>}
-                    {trip.username && <div className="trip-row-meta">{trip.username}</div>}
+                    {trip.username && trip.username !== trip.drivername && <div className="trip-row-meta">{trip.username}</div>}
                     {trip.numberPassengers !== undefined && <div className="trip-row-meta">Passengers: {trip.numberPassengers}</div>}
                     <div className="trip-row-price">
                       {trip.rating !== undefined && <> – <span className="trip-row-rating">⭐ {trip.rating}</span></>}
@@ -696,9 +756,17 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
         const data = await apiFetch<any>('bookings/me', { method: 'GET' });
         const transformed: Trip[] = data.map((b: any) => {
           const rideData = b.ride || {};
+          const driverObj = rideData.driver || {};
+          const driverName = driverObj.first_name
+            ? `${driverObj.first_name} ${driverObj.last_name}`
+            : b.passenger_name || `User ${b.user_id?.substring(0, 4)}`;
+
           return {
-            id: b.id, ride_id: b.ride_id,
-            username: rideData.driver?.first_name ? `${rideData.driver.first_name} ${rideData.driver.last_name}` : b.passenger_name || `User ${b.user_id?.substring(0, 4)}`,
+            id: b.id,
+            ride_id: b.ride_id,
+            driver_profile_id: driverObj.id ?? rideData.driver_id,
+            username: driverName,
+            drivername: driverName,
             destination: b.dropoff_location || rideData.destination || 'Destination',
             time: formatTime(b.pickup_time || rideData.departure_time),
             dateOnly: formatDateOnly(b.pickup_time || rideData.departure_time),
@@ -714,13 +782,27 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
         const finalDriverActivities: Trip[] = [];
         ridesData.forEach((ride: any) => {
           finalDriverActivities.push({
-            id: ride.id, ride_id: ride.id, destination: ride.destination,
-            time: formatTime(ride.departure_time), dateOnly: formatDateOnly(ride.departure_time), timeOnly: formatTimeOnly(ride.departure_time),
-            status: ride.status === 'completed' ? 'pastDriver' : ride.status === 'in_progress' ? 'activeDriver' : 'upcomingDriver',
-            action: 'More', numberPassengers: ride.seats_total - ride.seats_available,
-            passengers: ride.bookings.filter((b: any) => b.status === 'confirmed').map((b: any) => ({
-                id: b.id, profileId: b.passenger?.id ?? b.passenger_id, name: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown',
-                rating: b.passenger?.rider_rating, pickupLocation: b.pickup_location, cost: `£2.00`, rated: false
+            id: ride.id,
+            ride_id: ride.id,
+            destination: ride.destination,
+            time: formatTime(ride.departure_time),
+            dateOnly: formatDateOnly(ride.departure_time),
+            timeOnly: formatTimeOnly(ride.departure_time),
+            status: ride.status === 'completed' ? 'pastDriver' :
+              ride.status === 'in_progress' ? 'activeDriver' : 'upcomingDriver',
+            action: 'More',
+            numberPassengers: ride.seats_total - ride.seats_available,
+            passengers: ride.bookings
+              .filter((b: any) => b.status === 'confirmed' || b.status === 'completed')
+              .map((b: any) => ({
+                id: b.id,
+                profileId: b.passenger?.id ?? b.passenger_id,
+                rideId: ride.id,
+                name: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown',
+                rating: b.passenger?.rider_rating && b.passenger.rider_rating > 0 ? b.passenger.rider_rating : undefined,
+                pickupLocation: b.pickup_location,
+                cost: `£2.00`,
+                rated: false
               }))
           });
 
