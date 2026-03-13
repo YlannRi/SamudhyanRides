@@ -115,12 +115,12 @@ const TimetablePage: React.FC<Props> = ({ onBack, onSelectEvent }) => {
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input type="checkbox" checked={dayOnly} onChange={(e) => setDayOnly(e.target.checked)} />
-            <span style={{ color: 'var(--text-secondary)' }}>Day</span>
+            <span style={{ color: 'var(--text-typed)' }}>Day</span>
           </label>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input type="checkbox" checked={rememberUrl} onChange={(e) => setRememberUrl(e.target.checked)} />
-            <span style={{ color: 'var(--text-secondary)' }}>Remember URL</span>
+            <span style={{ color: 'var(--text-typed)' }}>Remember URL</span>
           </label>
         </div>
 

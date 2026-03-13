@@ -203,7 +203,7 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
       )}
 
       {/* Map */}
-      <div style={{ marginBottom: '16px' }}>
+      <div style={{ marginBottom: '16px', marginTop: '16px' }}>
         <RideRenderMap 
            rideId={activeRide.id} 
            height="300px" 
