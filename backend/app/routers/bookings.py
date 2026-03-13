@@ -244,6 +244,31 @@ def get_my_bookings(current_user: dict = Depends(get_current_user)):
 
     return bookings.data
 
+@router.get("/rides/{ride_id}/vehicle")
+def get_vehicle_info(ride_id: str, current_user: dict = Depends(get_current_user)):
+    # Get the ride to find the driver
+    ride = supabase.table("rides") \
+        .select("driverid") \
+        .eq("id", ride_id) \
+        .execute()
+
+    if not ride.data:
+        raise HTTPException(status_code=404, detail="Ride not found")
+
+    driver_id = ride.data[0]["driverid"]
+
+    # Fetch vehicle info from driver_verification
+    verification = supabase.table("driver_verification") \
+        .select("car_model, number_plate") \
+        .eq("userid", driver_id) \
+        .execute()
+
+    if not verification.data:
+        raise HTTPException(status_code=404, detail="Vehicle info not found")
+
+    return verification.data[0]
+
+
 
 # Confirm pickup (passenger provides code to driver)
 @router.post("/bookings/{booking_id}/confirm-pickup")

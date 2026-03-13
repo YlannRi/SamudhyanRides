@@ -27,6 +27,7 @@ const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, partic
   const departureDate = new Date(ride.departure_time || trip.pickup_time);
   const timeOfArrival = isNaN(departureDate.getTime()) ? 'Pending' : departureDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+
   return (
     <div className="journey-content">
       {/* Multiple Active Rides Toggle */}
@@ -71,7 +72,8 @@ const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, partic
       {/* Trip details */}
       <div className="journey-passenger-card">
         <DetailRow label="Destination" value={trip.dropoff_location || ride.destination || '—'} />
-        <DetailRow label="Vehicle" value="Standard Vehicle" />
+        <DetailRow label="Vehicle" value={trip.vehicle?.car_model ?? "Unknown Vehicle"} />
+        <DetailRow label="Numberplate" value={trip.vehicle?.number_plate ?? "Not available"} />
         <DetailRow label="Departure Time" value={timeOfArrival} />
         <DetailRow label="Cost" value={`£2.00`} valueClass="detail-price" />
       </div>
@@ -284,9 +286,28 @@ const JourneyPage: React.FC<{
       if (userRes.ok) {
         const userData = await userRes.json();
         const activeBookings = userData.filter((b: any) => b.status === 'confirmed' && b.ride?.status === 'in_progress');
-        console.log("Active bookings:", activeBookings);
-        setActiveUserTrips(activeBookings);
+
+        // NEW: enrich each booking with vehicle info
+        const enriched = await Promise.all(
+          activeBookings.map(async (b: any) => {
+            try {
+              const vRes = await fetch(
+                `http://localhost:8000/bookings/rides/${b.rideid}/vehicle`,
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              if (vRes.ok) {
+                const vehicle = await vRes.json();
+                return { ...b, vehicle };
+              }
+            } catch (_) { }
+            return b;
+          })
+        );
+
+        setActiveUserTrips(enriched);
       }
+
+
 
       // Fetch Driver Dashboard
       const driverRes = await fetch('https://localhost:8000/rides/driver/dashboard', {
