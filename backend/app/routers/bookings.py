@@ -248,19 +248,19 @@ def get_my_bookings(current_user: dict = Depends(get_current_user)):
 def get_vehicle_info(ride_id: str, current_user: dict = Depends(get_current_user)):
     # Get the ride to find the driver
     ride = supabase.table("rides") \
-        .select("driverid") \
+        .select("driver_id") \
         .eq("id", ride_id) \
         .execute()
 
     if not ride.data:
         raise HTTPException(status_code=404, detail="Ride not found")
 
-    driver_id = ride.data[0]["driverid"]
+    driver_id = ride.data[0]["driver_id"]
 
     # Fetch vehicle info from driver_verification
     verification = supabase.table("driver_verification") \
         .select("car_model, number_plate") \
-        .eq("userid", driver_id) \
+        .eq("driver_id", driver_id) \
         .execute()
 
     if not verification.data:

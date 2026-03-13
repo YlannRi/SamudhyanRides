@@ -20,6 +20,7 @@ const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, partic
   }
 
   const trip = trips[activeTripIdx];
+  console.log("Rendering trip", trip);
   const ride = trip.ride || {};
   const driver = ride.driver || {};
   const driverName = driver.first_name ? `${driver.first_name} ${driver.last_name}` : 'Unknown Driver';
@@ -287,19 +288,27 @@ const JourneyPage: React.FC<{
         const userData = await userRes.json();
         const activeBookings = userData.filter((b: any) => b.status === 'confirmed' && b.ride?.status === 'in_progress');
 
-        // NEW: enrich each booking with vehicle info
         const enriched = await Promise.all(
           activeBookings.map(async (b: any) => {
+
             try {
               const vRes = await fetch(
-                `http://localhost:8000/bookings/rides/${b.rideid}/vehicle`,
-                { headers: { Authorization: `Bearer ${token}` } }
+                `https://localhost:8000/bookings/rides/${b.ride_id}/vehicle`,  // <-- use ride_id
+                {
+                  headers: { Authorization: `Bearer ${token}` },
+                }
               );
+
+
               if (vRes.ok) {
                 const vehicle = await vRes.json();
                 return { ...b, vehicle };
               }
-            } catch (_) { }
+            } catch (e) {
+              console.error("Vehicle fetch failed for ride", b.ride_id, e);
+            }
+
+            // fallback: booking without vehicle
             return b;
           })
         );
