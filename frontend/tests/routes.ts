@@ -1,5 +1,5 @@
 export const PUBLIC_ROUTES = [
-  '/', // home (shows login UI when unauthenticated)
+  '/',
   '/login',
 ];
 
@@ -12,4 +12,5 @@ export const AUTH_ROUTES = [
   '/timetable',
   '/settings',
   '/safety',
+  '/inbox',
 ];

@@ -51,6 +51,21 @@ describe('HomePage Component', () => {
     expect(mockProps.onRequestRide).toHaveBeenCalledWith({ destination: 'University of Bath' });
   });
 
+  it('calls onPostRide with destination when a shortcut is clicked in Driver mode', () => {
+    render(<HomePage {...mockProps} canUseDriverMode={true} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Driver' }));
+    fireEvent.click(screen.getByText('University of Bath'));
+
+    expect(mockProps.onPostRide).toHaveBeenCalledWith(
+      expect.objectContaining({
+        destination: 'University of Bath',
+        arrivalDateTimeLocal: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
+      }),
+    );
+    expect(mockProps.onRequestRide).not.toHaveBeenCalled();
+  });
+
   it('calls onOpenTimetable when Timetable service is clicked', () => {
     render(<HomePage {...mockProps} />);
 
@@ -144,6 +159,28 @@ describe('HomePage Component', () => {
       // Clicking the new shortcut
       fireEvent.click(screen.getByText('My House'));
       expect(mockProps.onRequestRide).toHaveBeenCalledWith({ destination: '10 Test Lane, BA1 1AA, Bath' });
+    });
+
+    it('uses post-ride prefill for saved-place shortcuts in Driver mode', () => {
+      render(<HomePage {...mockProps} canUseDriverMode={true} />);
+
+      fireEvent.click(screen.getByText('Save a place'));
+      fireEvent.change(screen.getByPlaceholderText('e.g. Home'), { target: { value: 'My House' } });
+      fireEvent.change(screen.getByPlaceholderText('e.g. 12 Example Street'), { target: { value: '10 Test Lane' } });
+      fireEvent.change(screen.getByPlaceholderText('e.g. BA2 7AY'), { target: { value: 'BA1 1AA' } });
+      fireEvent.change(screen.getByPlaceholderText('e.g. Bath'), { target: { value: 'Bath' } });
+      fireEvent.click(screen.getByText('Save'));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Driver' }));
+      fireEvent.click(screen.getByText('My House'));
+
+      expect(mockProps.onPostRide).toHaveBeenCalledWith(
+        expect.objectContaining({
+          destination: '10 Test Lane, BA1 1AA, Bath',
+          arrivalDateTimeLocal: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
+        }),
+      );
+      expect(mockProps.onRequestRide).not.toHaveBeenCalled();
     });
 
     it('loads existing saved places from localStorage on mount', () => {

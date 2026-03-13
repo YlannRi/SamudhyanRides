@@ -3,6 +3,13 @@ import string
 
 from app.accounts.database import supabase
 from app.accounts.dependencies import get_current_user
+from app.notification.service import (
+    get_profile_name,
+    notify_driver_of_booking_cancellation,
+    notify_driver_of_booking_request,
+    notify_passenger_of_booking_acceptance,
+    notify_passenger_of_booking_cancellation,
+)
 from fastapi import APIRouter, Depends, HTTPException
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
@@ -64,6 +71,14 @@ def request_booking(
         "status": "pending"
     }).execute()
 
+    passenger_name = get_profile_name(passenger_id)
+    notify_driver_of_booking_request(
+        driver_id=ride["driver_id"],
+        passenger_name=passenger_name,
+        destination=ride.get("destination") or dropoff_location,
+        ride_id=ride_id,
+    )
+
     return {"message": "Booking requested", "booking": booking.data[0]}
 
 
@@ -120,6 +135,12 @@ def accept_booking(
         }) \
         .eq("id", booking_id) \
         .execute()
+
+    notify_passenger_of_booking_acceptance(
+        passenger_id=booking["passenger_id"],
+        destination=ride.get("destination") or booking.get("dropoff_location") or "your destination",
+        ride_id=booking["ride_id"],
+    )
 
     return updated.data[0]
 
@@ -178,7 +199,7 @@ def cancel_booking(booking_id: str, current_user: dict = Depends(get_current_use
 
     # 2. Fetch the associated ride to get the driver_id and current seats
     ride_res = supabase.table("rides") \
-        .select("driver_id, seats_available") \
+        .select("driver_id, seats_available, destination") \
         .eq("id", ride_id) \
         .execute()
 
@@ -198,6 +219,22 @@ def cancel_booking(booking_id: str, current_user: dict = Depends(get_current_use
     # 5. Restore the available seat on the ride
     new_seats = ride["seats_available"] + 1
     supabase.table("rides").update({"seats_available": new_seats}).eq("id", ride_id).execute()
+
+    destination = ride.get("destination") or booking.get("dropoff_location") or "your destination"
+
+    if profile_id == passenger_id:
+        notify_driver_of_booking_cancellation(
+            driver_id=driver_id,
+            passenger_name=get_profile_name(passenger_id),
+            destination=destination,
+            ride_id=ride_id,
+        )
+    else:
+        notify_passenger_of_booking_cancellation(
+            passenger_id=passenger_id,
+            destination=destination,
+            ride_id=ride_id,
+        )
 
     return {"message": "Passenger removed / Booking cancelled"}
 

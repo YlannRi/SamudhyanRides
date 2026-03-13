@@ -3,8 +3,11 @@ import { Icons } from './App';
 import {
   type Notification,
   fetchNotifications,
-  markAllRead,
+  markReadByLink,
 } from './lib/notifications';
+
+const inboxMetaText = 'var(--text-muted)';
+const inboxTimeText = 'var(--text-subtle)';
 
 type InboxPageProps = {
   onBack: () => void;
@@ -24,10 +27,17 @@ const InboxPage: React.FC<InboxPageProps> = ({ onBack, onNavigate }) => {
     })();
   }, []);
 
-  useEffect(() => {
-    // Mark all as read when opening inbox
-    markAllRead();
-  }, []);
+  const handleNotificationClick = async (notification: Notification) => {
+    if (notification.link) {
+      await markReadByLink(notification.link);
+      setNotifications((prev) =>
+        prev.map((item) =>
+          item.link === notification.link ? { ...item, read: true } : item,
+        ),
+      );
+      onNavigate(notification.link);
+    }
+  };
 
   const formatTime = (iso: string) => {
     const d = new Date(iso);
@@ -64,10 +74,10 @@ const InboxPage: React.FC<InboxPageProps> = ({ onBack, onNavigate }) => {
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, flex: 1 }}>Inbox</h2>
       </div>
 
-      {loading && <p style={{ padding: 20, color: 'rgba(255,255,255,0.5)' }}>Loading...</p>}
+      {loading && <p style={{ padding: 20, color: inboxMetaText }}>Loading...</p>}
 
       {!loading && notifications.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'rgba(255,255,255,0.4)' }}>
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: inboxMetaText }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
           <div style={{ fontWeight: 600, marginBottom: 4 }}>No notifications yet</div>
           <div style={{ fontSize: 13 }}>You'll see messages and ride updates here</div>
@@ -80,20 +90,20 @@ const InboxPage: React.FC<InboxPageProps> = ({ onBack, onNavigate }) => {
             <button
               key={n.id}
               type="button"
-              onClick={() => n.link && onNavigate(n.link)}
+              onClick={() => void handleNotificationClick(n)}
               style={{
                 display: 'flex', alignItems: 'flex-start', gap: 12,
-                padding: '14px 16px', background: 'none', border: 'none',
+                padding: '14px 16px', background: n.read ? 'none' : 'rgba(201, 166, 82, 0.16)', border: 'none',
                 borderBottom: '1px solid rgba(255,255,255,0.06)',
                 cursor: n.link ? 'pointer' : 'default', textAlign: 'left',
                 color: 'inherit', width: '100%',
-                opacity: n.read ? 0.6 : 1,
+                opacity: 1,
               }}
             >
               <div style={{ fontSize: 22, paddingTop: 2 }}>{typeEmoji(n.type)}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontWeight: n.read ? 500 : 700, fontSize: 14 }}>{n.title}</span>
+                  <span style={{ fontWeight: n.read ? 500 : 800, fontSize: 14, color: n.read ? inboxMetaText : 'var(--text-primary)' }}>{n.title}</span>
                   {!n.read && (
                     <span style={{
                       width: 7, height: 7, borderRadius: '50%', background: '#3b82f6',
@@ -103,13 +113,13 @@ const InboxPage: React.FC<InboxPageProps> = ({ onBack, onNavigate }) => {
                 </div>
                 {n.body && (
                   <div style={{
-                    fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 2,
+                    fontSize: 13, color: n.read ? inboxMetaText : 'var(--text-primary)', marginTop: 2,
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
                     {n.body}
                   </div>
                 )}
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: n.read ? inboxTimeText : 'var(--text-primary)', fontWeight: n.read ? 400 : 700, marginTop: 4 }}>
                   {formatTime(n.created_at)}
                 </div>
               </div>

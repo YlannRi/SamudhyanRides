@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { PUBLIC_ROUTES, AUTH_ROUTES } from './routes';
-import { runAxe } from './a11y-helpers';
+import { expectNoViolations, seedAuth, navigateAndSettle } from './a11y-helpers';
 import { installApiMocks } from './mocks/apiMock';
 
 test.beforeEach(async ({ page }) => {
@@ -8,66 +8,34 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function login(page: Page) {
-  // Seed auth before the app loads
-  await page.addInitScript(() => {
-    localStorage.setItem('authToken', 'test-token');
-    document.cookie = `authToken=${encodeURIComponent('test-token')}; Path=/; SameSite=Lax`;
-  });
-
-  // Hit an authenticated page to let App.tsx bootstrap (/users/me, /drivers/me/status)
+  await seedAuth(page);
   await page.goto('/account');
   await page.waitForLoadState('networkidle');
-
-  // Confirm we didn't get bounced to login
   await expect(page).not.toHaveURL(/\/login(?:\?|$)/);
 }
 
-function formatViolations(baseURL: string | undefined, route: string, violations: any[]) {
-  const origin = baseURL ?? '';
-  return (
-    `A11y violations on ${origin}${route}:\n` +
-    violations
-      .map(
-        (v) =>
-          `- ${v.id}: ${v.help}\n  ` +
-          v.nodes.map((n: any) => (Array.isArray(n.target) ? n.target.join(', ') : String(n.target))).join(', ')
-      )
-      .join('\n')
-  );
-}
+/* ─── Public routes – initial render ───────────────────────── */
 
-test.describe('WCAG A/AA scan - public routes', () => {
+test.describe('WCAG A/AA – public routes', () => {
   for (const route of PUBLIC_ROUTES) {
-    test(`axe: ${route}`, async ({ page, baseURL }) => {
-      await page.goto(route);
-      await page.waitForLoadState('networkidle');
-
-      const results = await runAxe(page);
-
-      expect(
-        results.violations,
-        formatViolations(baseURL, route, results.violations)
-      ).toEqual([]);
+    test(`axe scan: ${route}`, async ({ page }) => {
+      await navigateAndSettle(page, route);
+      await expectNoViolations(page, `public ${route}`);
     });
   }
 });
 
-test.describe('WCAG A/AA scan - authenticated routes', () => {
+/* ─── Authenticated routes – initial render ────────────────── */
+
+test.describe('WCAG A/AA – authenticated routes', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
   });
 
   for (const route of AUTH_ROUTES) {
-    test(`axe (auth): ${route}`, async ({ page, baseURL }) => {
-      await page.goto(route);
-      await page.waitForLoadState('networkidle');
-
-      const results = await runAxe(page);
-
-      expect(
-        results.violations,
-        formatViolations(baseURL, route, results.violations)
-      ).toEqual([]);
+    test(`axe scan (auth): ${route}`, async ({ page }) => {
+      await navigateAndSettle(page, route);
+      await expectNoViolations(page, `auth ${route}`);
     });
   }
 });

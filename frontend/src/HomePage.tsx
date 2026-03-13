@@ -3,7 +3,7 @@ import type { RidePrefill } from './TimetablePage';
 
 type HomePageProps = {
   onRequestRide: (prefill?: RidePrefill) => void;
-  onPostRide: () => void;
+  onPostRide: (prefill?: RidePrefill) => void;
   canUseDriverMode: boolean;
   onDriverSignup: () => void;
   onOpenTimetable: () => void;
@@ -11,8 +11,8 @@ type HomePageProps = {
 
 type SavedPlace = {
   id: string;
-  label: string;
-  address: string;
+  label: string;      // e.g. "My Flat"
+  address: string;    // street/area
   postcode: string;
   city?: string;
 };
@@ -36,6 +36,16 @@ function genId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
+function toDatetimeLocalNow() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
 const HomePage: React.FC<HomePageProps> = ({
   onRequestRide,
   onPostRide,
@@ -45,6 +55,7 @@ const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const [mode, setMode] = useState<'user' | 'Driver'>('user');
 
+  // Saved places
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>(() => loadSavedPlaces());
   const [showSavePlace, setShowSavePlace] = useState(false);
   const [placeForm, setPlaceForm] = useState({
@@ -75,7 +86,12 @@ const HomePage: React.FC<HomePageProps> = ({
     setShowSavePlace(false);
   };
 
-  const openRequest = (destination: string) => {
+  const openShortcut = (destination: string) => {
+    if (mode === 'Driver') {
+      onPostRide({ destination, arrivalDateTimeLocal: toDatetimeLocalNow() });
+      return;
+    }
+
     onRequestRide({ destination });
   };
 
@@ -103,6 +119,7 @@ const HomePage: React.FC<HomePageProps> = ({
         </div>
       </header>
 
+      {/* Where to? pill */}
       <div className="home-body">
         <button
           className="home-where-pill"
@@ -116,11 +133,13 @@ const HomePage: React.FC<HomePageProps> = ({
           <span className="home-where-text">{mode === 'Driver' ? 'Post a ride' : 'Request a ride'}</span>
         </button>
 
+        {/* Shortcuts */}
         <div className="home-section">
           <div className="home-section-title">Shortcuts</div>
 
           <div className="home-list-card">
-            <button className="home-list-row" onClick={() => openRequest('University of Bath')}>
+            {/* University of Bath (fixed shortcut) */}
+            <button className="home-list-row" onClick={() => openShortcut('University of Bath')}>
               <div className="home-list-icon">🏫</div>
               <div className="home-list-text">
                 <div className="home-list-title">University of Bath</div>
@@ -129,11 +148,12 @@ const HomePage: React.FC<HomePageProps> = ({
               <div className="home-list-chevron">›</div>
             </button>
 
+            {/* Render user saved places (only ones they add) */}
             {shortcuts.map((p) => (
               <button
                 key={p.id}
                 className="home-list-row"
-                onClick={() => openRequest(`${p.address}, ${p.postcode}${p.city ? `, ${p.city}` : ''}`)}
+                onClick={() => openShortcut(`${p.address}, ${p.postcode}${p.city ? `, ${p.city}` : ''}`)}
               >
                 <div className="home-list-icon">📍</div>
                 <div className="home-list-text">
@@ -147,6 +167,7 @@ const HomePage: React.FC<HomePageProps> = ({
               </button>
             ))}
 
+            {/* Save a place */}
             <button className="home-list-row home-list-row-add" onClick={() => setShowSavePlace(true)}>
               <div className="home-list-icon">＋</div>
               <div className="home-list-text">
@@ -156,6 +177,7 @@ const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
 
+        {/* Services */}
         <div className="home-section">
           <div className="home-section-title">Services</div>
 
@@ -171,6 +193,7 @@ const HomePage: React.FC<HomePageProps> = ({
         </div>
       </div>
 
+      {/* Save place modal */}
       {showSavePlace && (
         <div className="modal-backdrop" onClick={() => setShowSavePlace(false)}>
           <div
@@ -181,7 +204,7 @@ const HomePage: React.FC<HomePageProps> = ({
             tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
           >
-            <div id="save-place-title" style={{ fontWeight: 900, fontSize: 16, marginBottom: 10, color: 'var(--text-typed)' }}>
+            <div id="save-place-title" style={{ fontWeight: 900, fontSize: 16, marginBottom: 10 }}>
               Save a place
             </div>
 

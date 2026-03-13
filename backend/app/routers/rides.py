@@ -3,6 +3,7 @@ from typing import Optional
 
 from app.accounts.database import supabase
 from app.accounts.dependencies import get_current_user
+from app.notification.service import notify_passengers_of_ride_cancellation, notify_ride_started
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -236,6 +237,21 @@ def update_ride(
         .eq("id", ride_id) \
         .execute()
 
+    if ride_update.status == "in_progress":
+        bookings_res = supabase.table("bookings") \
+            .select("passenger_id, status") \
+            .eq("ride_id", ride_id) \
+            .eq("status", "confirmed") \
+            .execute()
+
+        passenger_ids = [booking["passenger_id"] for booking in (bookings_res.data or []) if booking.get("passenger_id")]
+        notify_ride_started(
+            driver_id=profile_id,
+            passenger_ids=passenger_ids,
+            destination=ride_data.get("destination") or "your destination",
+            ride_id=ride_id,
+        )
+
     return updated.data[0]
 
 
@@ -256,9 +272,25 @@ def cancel_ride(
     if not existing.data:
         raise HTTPException(status_code=403, detail="Not your ride")
 
+    ride_data = existing.data[0]
+
+    bookings_res = supabase.table("bookings") \
+        .select("passenger_id") \
+        .eq("ride_id", ride_id) \
+        .neq("status", "cancelled") \
+        .execute()
+
     supabase.table("rides") \
         .update({"status": "cancelled"}) \
         .eq("id", ride_id) \
         .execute()
+
+    passenger_ids = [booking["passenger_id"] for booking in (bookings_res.data or []) if booking.get("passenger_id")]
+    if passenger_ids:
+        notify_passengers_of_ride_cancellation(
+            passenger_ids=passenger_ids,
+            destination=ride_data.get("destination") or "your destination",
+            ride_id=ride_id,
+        )
 
     return {"message": "Ride cancelled"}

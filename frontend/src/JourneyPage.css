@@ -22,7 +22,7 @@
   align-items: center;
   gap: 12px;
   background: var(--bg-surface);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 14px 16px;
   margin-bottom: 16px;
@@ -40,7 +40,7 @@
   font-weight: 700;
   color: var(--text-primary);
   flex-shrink: 0;
-  border: 2px solid rgba(255, 255, 255, 0.12);
+  border: 2px solid var(--border-avatar);
 }
 
 .journey-driver-info {
@@ -68,7 +68,7 @@
   border: 1px solid rgba(74, 222, 128, 0.25);
   border-radius: 999px;
   padding: 5px 10px;
-  color: #4ade80;
+  color: var(--color-green-light);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -81,7 +81,7 @@
   align-items: center;
   justify-content: space-between;
   background: var(--bg-surface);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 14px 16px;
   margin-bottom: 16px;
@@ -103,7 +103,7 @@
   background: var(--bg-surface-alt);
   padding: 4px 14px;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-subtle);
 }
 
 /* ─── Actions row ────────────────────────────────────────────── */
@@ -156,13 +156,13 @@
 .tab-done-dot {
   margin-left: 4px;
   font-size: 11px;
-  color: #4ade80;
+  color: var(--color-green-light);
 }
 
 /* ─── Passenger card (driver mode) ──────────────────────────── */
 .journey-passenger-card {
   background: var(--bg-surface);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 16px;
   margin-bottom: 4px;
@@ -191,7 +191,7 @@
   font-weight: 700;
   color: var(--text-primary);
   flex-shrink: 0;
-  border: 2px solid rgba(255, 255, 255, 0.12);
+  border: 2px solid var(--border-avatar);
 }
 
 .journey-passenger-info {
@@ -224,7 +224,7 @@
   margin-left: auto;
   background: rgba(34, 197, 94, 0.15);
   border: 1px solid rgba(74, 222, 128, 0.25);
-  color: #4ade80;
+  color: var(--color-green-light);
   font-size: 12px;
   font-weight: 700;
   padding: 4px 10px;

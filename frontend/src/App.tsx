@@ -37,6 +37,22 @@ const parseChatLink = (link: string) => {
   };
 };
 
+const applyRouteMode = (
+  url: URL,
+  setActivityMode: React.Dispatch<React.SetStateAction<'user' | 'Driver'>>,
+  setJourneyMode: React.Dispatch<React.SetStateAction<'user' | 'driver'>>,
+) => {
+  const requestedMode = url.searchParams.get('mode');
+
+  if (url.pathname.startsWith('/activity')) {
+    setActivityMode(requestedMode === 'driver' ? 'Driver' : 'user');
+  }
+
+  if (url.pathname.startsWith('/journey')) {
+    setJourneyMode(requestedMode === 'driver' ? 'driver' : 'user');
+  }
+};
+
 const pathToTab = (path: string): Tab => {
   if (path.startsWith('/chat')) return 'chat';
   if (path.startsWith('/inbox')) return 'inbox';
@@ -216,6 +232,7 @@ const App: React.FC = () => {
   });
   const [authScreen, setAuthScreen] = useState<'login' | 'driverSignup'>('login');
   const [requestRidePrefill, setRequestRidePrefill] = useState<RidePrefill | undefined>(undefined);
+  const [postRidePrefill, setPostRidePrefill] = useState<RidePrefill | undefined>(undefined);
   const [journeyMode, setJourneyMode] = useState<'user' | 'driver'>('user');
   const [activityMode, setActivityMode] = useState<'user' | 'Driver'>('user');
   const [chatRideId, setChatRideId] = useState<string | null>(null);
@@ -253,20 +270,23 @@ const App: React.FC = () => {
     const chatRoute = parseChatLink(link);
     if (chatRoute) {
       openChat(chatRoute.rideId, chatRoute.participantId);
-    } else if (link.startsWith('/activity')) {
-      navigate('activity');
     } else {
-      navigate('home');
+      const url = new URL(link, window.location.origin);
+      applyRouteMode(url, setActivityMode, setJourneyMode);
+      window.history.pushState({}, '', `${url.pathname}${url.search}`);
+      setActiveTab(pathToTab(url.pathname));
     }
   };
 
   useEffect(() => {
     const syncRouteState = () => {
+      const currentUrl = new URL(window.location.href);
       const chatRoute = parseChatLink(window.location.href);
       if (chatRoute) {
         setChatRideId(chatRoute.rideId);
         setChatParticipantId(chatRoute.participantId);
       }
+      applyRouteMode(currentUrl, setActivityMode, setJourneyMode);
       setActiveTab(pathToTab(window.location.pathname));
     };
 
@@ -366,7 +386,10 @@ const App: React.FC = () => {
               setRequestRidePrefill(prefill);
               navigate('request');
             }}
-            onPostRide={() => void goToDriverTab('post')}
+            onPostRide={(prefill) => {
+              setPostRidePrefill(prefill);
+              void goToDriverTab('post');
+            }}
             canUseDriverMode={canUseDriverMode}
             onDriverSignup={() => startDriverSignup('post')}
             onOpenTimetable={() => navigate('timetable')}
@@ -392,7 +415,7 @@ const App: React.FC = () => {
             </div>
           );
         }
-        return <PostRidePage />;
+        return <PostRidePage prefill={postRidePrefill} />;
       case 'account':
                 return (
           <AccountPage
@@ -459,7 +482,10 @@ const App: React.FC = () => {
         return (
           <HomePage
             onRequestRide={() => navigate('request')}
-            onPostRide={() => goToDriverTab('post')}
+            onPostRide={(prefill) => {
+              setPostRidePrefill(prefill);
+              void goToDriverTab('post');
+            }}
             canUseDriverMode={canUseDriverMode}
             onDriverSignup={() => startDriverSignup('post')}
             onOpenTimetable={() => navigate('timetable')}
