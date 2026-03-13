@@ -72,7 +72,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                 auth: false,
             });
 
-
             if (mode === 'login') {
                 if (data.access_token || data.token) {
                     setAuthToken(data.access_token || data.token);
@@ -162,20 +161,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                 </div>
 
                 {error && (
-                    <p style={{ color: '#f87171', fontSize: '14px', marginBottom: '12px' }}>
+                    <p className="auth-alert-error">
                         {error}
                     </p>
                 )}
 
                 {successMessage && (
-                    <div style={{
-                        padding: '12px',
-                        backgroundColor: 'rgba(34,197,94,0.15)',
-                        color: '#4ade80',
-                        borderRadius: '8px',
-                        marginBottom: '16px',
-                        fontSize: '14px'
-                    }}>
+                    <div className="auth-alert-success">
                         {successMessage}
                     </div>
                 )}
@@ -264,24 +256,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                                 />
                             </div>
 
-                            <label
-                                style={{
-                                    display: 'flex',
-                                    gap: '10px',
-                                    alignItems: 'center',
-                                    marginTop: '10px',
-                                    fontSize: '14px',
-                                    color: '#e5e7eb',
-                                    userSelect: 'none',
-                                }}
-                            >
+                            <label className="auth-checkbox-row">
                                 <input
                                     type="checkbox"
                                     checked={signupAsDriver}
                                     onChange={(e) => setSignupAsDriver(e.target.checked)}
-                                    style={{ width: '16px', height: '16px' }}
                                 />
-                                Do you want to sign up as a driver?
+                                <span className="auth-checkbox-label">Do you want to sign up as a driver?</span>
                             </label>
                         </>
                     )}

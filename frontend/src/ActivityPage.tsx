@@ -29,31 +29,11 @@ type Trip = {
   passengers?: any[];
 };
 
-
-
-
-
-
-
 const RATING_LABELS: Record<number, string> = { 1: 'Poor', 2: 'Fair', 3: 'Good', 4: 'Great', 5: 'Excellent' };
-
 
 // ── Rating UI ──────────────────────────────────────────────────
 const RatingUI: React.FC<{
   target: { name: string; role: 'driver' | 'passenger' };
-
-  // BACKEND REQUIRED
-  // When submitting a rating:
-  //
-  //
-  // Backend should:
-  // - Save rating
-  // - Update user's average rating
-  // - Mark trip as "rated"
-  // - Prevent duplicate ratings (shouldn't be an issue based on frontend design)
-  //
-  // After success, refetch trip data.
-
   onSubmit: (r: number) => void;
   onClose: () => void;
 }> = ({ target, onSubmit, onClose }) => {
@@ -78,7 +58,7 @@ const RatingUI: React.FC<{
             onClick={() => setSelected(n)} aria-label={`${n} star`}
           >
             <svg width="40" height="40" viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-              fill={n <= display ? '#fbbf24' : 'none'} stroke={n <= display ? '#fbbf24' : 'rgba(255,255,255,0.25)'}>
+              fill={n <= display ? '#fbbf24' : 'none'} stroke={n <= display ? '#fbbf24' : 'var(--text-placeholder)'}>
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>
           </button>
@@ -102,15 +82,6 @@ const RatingUI: React.FC<{
 
 // ── Report UI ──────────────────────────────────────────────────
 const ReportUI: React.FC<{
-
-  // BACKEND REQUIRED
-  // Send trip report:
-  //
-  //
-  // Backend should:
-  // - Store report
-  // - Link to trip + involved users? (Not necessary for video)
-
   onSubmit: (text: string) => void;
   onClose: () => void
 }> = ({ onSubmit, onClose }) => {
@@ -119,7 +90,7 @@ const ReportUI: React.FC<{
   return (
     <div className="rating-modal-content">
       <div className="report-icon-wrap">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#d32f2f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
           <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
@@ -165,8 +136,6 @@ const ConfirmUI: React.FC<{
   </div>
 );
 
-
-
 // Master modal shell
 type ModalState =
   | { type: 'rating'; target: { name: string; role: 'driver' | 'passenger' } }
@@ -178,12 +147,10 @@ type ModalState =
   | { type: 'success'; icon: string; title: string; sub: string }
   | { type: 'start'; title: string; body: string; targetId: number };
 
-
-// What comes up when driver kicks, rates etc
 const Modal: React.FC<{
   state: ModalState;
   onClose: () => void;
-  onDone: () => void;      // close sheet + return to activity
+  onDone: () => void;
   onConfirmAction?: () => Promise<boolean>;
 }> = ({ state, onClose, onDone, onConfirmAction }) => {
 
@@ -199,28 +166,19 @@ const Modal: React.FC<{
 
   const modalTitle = (() => {
     switch (inner.type) {
-      case 'rating':
-        return 'How was your trip?';
-      case 'report':
-        return 'Report an Issue';
+      case 'rating': return 'How was your trip?';
+      case 'report': return 'Report an Issue';
       case 'cancel':
-      case 'start':
-        return inner.title;
-      case 'accept':
-        return `Accept ${inner.passengerName}?`;
-      case 'deny':
-        return `Deny ${inner.passengerName}?`;
-      case 'remove':
-        return `Remove ${inner.passengerName}?`;
-      case 'success':
-        return inner.title;
-      default:
-        return 'Dialog';
+      case 'start': return inner.title;
+      case 'accept': return `Accept ${inner.passengerName}?`;
+      case 'deny': return `Deny ${inner.passengerName}?`;
+      case 'remove': return `Remove ${inner.passengerName}?`;
+      case 'success': return inner.title;
+      default: return 'Dialog';
     }
   })();
 
   React.useEffect(() => {
-    // Move focus into the dialog when it opens
     window.setTimeout(() => dialogRef.current?.focus(), 0);
   }, []);
 
@@ -236,15 +194,8 @@ const Modal: React.FC<{
   }, [isSuccess, onClose]);
 
   const srOnly: React.CSSProperties = {
-    position: 'absolute',
-    width: 1,
-    height: 1,
-    padding: 0,
-    margin: -1,
-    overflow: 'hidden',
-    clip: 'rect(0, 0, 0, 0)',
-    whiteSpace: 'nowrap',
-    border: 0,
+    position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+    overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0,
   };
 
   return (
@@ -258,9 +209,7 @@ const Modal: React.FC<{
         aria-labelledby="activity-modal-title"
         tabIndex={-1}
       >
-        <h2 id="activity-modal-title" style={srOnly}>
-          {modalTitle}
-        </h2>
+        <h2 id="activity-modal-title" style={srOnly}>{modalTitle}</h2>
         <div className="rating-modal-handle-area"><div className="sheet-handle" /></div>
 
         {isSuccess && inner.type === 'success' ? (
@@ -270,127 +219,55 @@ const Modal: React.FC<{
             <div className="rating-success-sub">{inner.sub}</div>
           </div>
         ) : inner.type === 'rating' ? (
-          <RatingUI
-            target={inner.target}
-            onSubmit={() => succeed('⭐', 'Rating Submitted!', 'Thanks for your feedback')}
-            onClose={onClose}
-          />
+          <RatingUI target={inner.target} onSubmit={() => succeed('⭐', 'Rating Submitted!', 'Thanks for your feedback')} onClose={onClose} />
         ) : inner.type === 'report' ? (
-          <ReportUI
-            onSubmit={() => succeed('✅', 'Report Sent', 'Thanks for letting us know — we\'ll look into it')}
-            onClose={onClose}
-          />
+          <ReportUI onSubmit={() => succeed('✅', 'Report Sent', 'Thanks for letting us know — we\'ll look into it')} onClose={onClose} />
         ) : inner.type === 'cancel' ? (
           <ConfirmUI
-            // BACKEND REQUIRED
-            // Cancel trip:
-            //
-            // Backend must:
-            // - Update trip status
-            // - Notify driver/passengers
-            // - Handle "refund"
-            // - Prevent cancelling past trips
-            //
-            // After success, refetch trip lists.
-            icon="🚫" iconColor="#f87171"
-            title={inner.title} body={inner.body}
+            icon="🚫" iconColor="#d32f2f" title={inner.title} body={inner.body}
             confirmLabel="Yes, Cancel" confirmCls="btn-confirm-cancel"
             onConfirm={async () => {
-              if (onConfirmAction) {
-                const ok = await onConfirmAction();
-                if (!ok) return;
-              }
+              if (onConfirmAction) { const ok = await onConfirmAction(); if (!ok) return; }
               succeed('🚫', 'Trip Cancelled', 'Your trip has been cancelled successfully');
             }}
             onClose={onClose}
           />
         ) : inner.type === 'start' ? (
           <ConfirmUI
-            // BACKEND REQUIRED
-            // start trip:
-            //
-            // Backend must:
-            // - Update trip status
-            // - Notify driver/passengers
-            // - Prevent starting past trips
-            //
-            // After success, refetch trip lists.
-            icon="🏁" iconColor="#f87171"
-            title={inner.title} body={inner.body}
+            icon="🏁" iconColor="#d32f2f" title={inner.title} body={inner.body}
             confirmLabel="Yes, Start" confirmCls="btn-confirm-accept"
             onConfirm={async () => {
-              if (onConfirmAction) {
-                const ok = await onConfirmAction();
-                if (!ok) return;
-              }
+              if (onConfirmAction) { const ok = await onConfirmAction(); if (!ok) return; }
               succeed('🏁', 'Trip Started', 'Your trip has started successfully');
             }}
             onClose={onClose}
           />
         ) : inner.type === 'accept' ? (
           <ConfirmUI
-            // BACKEND REQUIRED
-            // Accept passenger request:
-            //
-            // Backend must:
-            // - Add passenger to trip
-            // - Update seat count
-            // - Change request status to upcoming
-            // - Notify passenger
-            // - Make sure valid
-            icon="✅" iconColor="#4ade80"
-            title={`Accept ${inner.passengerName}?`}
-            body={`${inner.passengerName} will be notified that their request has been accepted.`}
+            icon="✅" iconColor="#4ade80" title={`Accept ${inner.passengerName}?`} body={`${inner.passengerName} will be notified that their request has been accepted.`}
             confirmLabel="Accept Request" confirmCls="btn-confirm-accept"
             onConfirm={async () => {
-              if (onConfirmAction) {
-                const ok = await onConfirmAction();
-                if (!ok) return;
-              }
+              if (onConfirmAction) { const ok = await onConfirmAction(); if (!ok) return; }
               succeed('✅', 'Request Accepted!', `${inner.passengerName} has been added to your trip`);
             }}
             onClose={onClose}
           />
         ) : inner.type === 'deny' ? (
           <ConfirmUI
-            // BACKEND REQUIRED
-            // Deny passenger request:
-            //
-            // Backend must:
-            // - Update request status (remove from requested)
-            // - Notify passenger
-            icon="❌" iconColor="#f87171"
-            title={`Deny ${inner.passengerName}?`}
-            body={`${inner.passengerName} will be notified that their request has been declined.`}
+            icon="❌" iconColor="#d32f2f" title={`Deny ${inner.passengerName}?`} body={`${inner.passengerName} will be notified that their request has been declined.`}
             confirmLabel="Deny Request" confirmCls="btn-confirm-cancel"
             onConfirm={async () => {
-              if (onConfirmAction) {
-                const ok = await onConfirmAction();
-                if (!ok) return;
-              }
+              if (onConfirmAction) { const ok = await onConfirmAction(); if (!ok) return; }
               succeed('❌', 'Request Denied', `${inner.passengerName}'s request has been declined`);
             }}
             onClose={onClose}
           />
         ) : inner.type === 'remove' ? (
           <ConfirmUI
-            // BACKEND REQUIRED
-            // Remove passenger from trip:
-            //
-            // Backend must:
-            // - Remove passenger
-            // - Update seat availability
-            // - Notify passenger
-            // - refund?
-            icon="🗑" iconColor="#f87171"
-            title={`Remove ${inner.passengerName}?`}
-            body={`${inner.passengerName} will be removed from your trip and notified.`}
+            icon="🗑" iconColor="#d32f2f" title={`Remove ${inner.passengerName}?`} body={`${inner.passengerName} will be removed from your trip and notified.`}
             confirmLabel="Remove Passenger" confirmCls="btn-confirm-cancel"
             onConfirm={async () => {
-              if (onConfirmAction) {
-                const ok = await onConfirmAction();
-                if (!ok) return;
-              }
+              if (onConfirmAction) { const ok = await onConfirmAction(); if (!ok) return; }
               succeed('🗑️', 'Passenger Removed', `${inner.passengerName} has been removed from your trip`);
             }}
             onClose={onClose}
@@ -401,34 +278,23 @@ const Modal: React.FC<{
   );
 };
 
-
-
-
-// Passenger Carousel - when driver views past and upcoming users at bottom
+// Passenger Carousel
 type Passenger = {
-  id: number;
-  profileId?: string;
-  name: string;
-  rating?: number;
-  pickupLocation?: string;
-  cost?: string;
-  rated?: boolean;
-  triprated?: number;
+  id: number; profileId?: string; name: string; rating?: number;
+  pickupLocation?: string; cost?: string; rated?: boolean; triprated?: number;
 };
 
 const PassengerCarousel: React.FC<{
-  passengers: Passenger[];
-  isPast: boolean;
+  passengers: Passenger[]; isPast: boolean;
   onRatePassenger?: (p: Passenger) => void;
   onRemovePassenger?: (p: Passenger) => void;
   onMessage?: (p: Passenger) => void;
 }> = ({ passengers, isPast, onRatePassenger, onRemovePassenger, onMessage }) => {
   const [idx, setIdx] = useState(0);
 
-  // ADD THIS EARLY RETURN CHECK
   if (!passengers || passengers.length === 0) {
     return (
-      <div className="passenger-card" style={{ display: 'flex', justifyContent: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '14px' }}>
+      <div className="passenger-card" style={{ display: 'flex', justifyContent: 'center', padding: '24px', color: 'var(--text-label)', fontSize: '14px' }}>
         No passengers yet.
       </div>
     );
@@ -475,9 +341,7 @@ const PassengerCarousel: React.FC<{
           <Btn cls="btn-message" icon={Icons.message} label="Message" small onClick={() => onMessage?.(p)} />
           {isPast ? (
             <>
-              {!p.rated && (
-                <Btn cls="btn-rate" icon={Icons.star} label="Rate" small onClick={() => onRatePassenger?.(p)} />
-              )}
+              {!p.rated && <Btn cls="btn-rate" icon={Icons.star} label="Rate" small onClick={() => onRatePassenger?.(p)} />}
             </>
           ) : (
             <Btn cls="btn-cancel" icon={Icons.remove} label="Remove" small onClick={() => onRemovePassenger?.(p)} />
@@ -488,13 +352,9 @@ const PassengerCarousel: React.FC<{
   );
 };
 
-
-
-// Trip Details Panel - bit beneath the map when you press more
+// Trip Details Panel
 const TripDetailsPanel: React.FC<{
-  trip: Trip;
-  mode: 'user' | 'Driver';
-  onClose: () => void;
+  trip: Trip; mode: 'user' | 'Driver'; onClose: () => void;
   onOpenChat?: (rideId: string, participantId?: string) => void;
   onRideStarted?: () => void;
 }> = ({ trip, onClose, onOpenChat, onRideStarted }) => {
@@ -505,7 +365,6 @@ const TripDetailsPanel: React.FC<{
   const close = () => { setClosing(true); setTimeout(onClose, 320); };
   const openModal = (m: ModalState) => setModal(m);
   const closeModal = () => setModal(null);
-  // Called when action is confirmed + success shown — dismiss modal then sheet
   const doneModal = () => {
     const completedType = modal?.type;
     setModal(null);
@@ -515,7 +374,6 @@ const TripDetailsPanel: React.FC<{
     }
   };
 
-  // Add 'startRide' to the type signature
   const handleAction = async (type: 'accept' | 'deny' | 'cancelBooking' | 'removePassenger' | 'cancelRide' | 'startRide', targetId: number) => {
     try {
       let endpoint = '';
@@ -523,38 +381,25 @@ const TripDetailsPanel: React.FC<{
       let body: string | undefined = undefined;
 
       switch (type) {
-        case 'accept':
-          endpoint = `bookings/${targetId}/accept`;
-          method = 'PUT';
-          break;
+        case 'accept': endpoint = `bookings/${targetId}/accept`; method = 'PUT'; break;
         case 'deny':
         case 'cancelBooking':
-        case 'removePassenger':
-          endpoint = `bookings/${targetId}`;
-          method = 'DELETE';
-          break;
-        case 'cancelRide':
-          endpoint = `rides/${targetId}`;
-          method = 'DELETE';
-          break;
-        case 'startRide':
-          endpoint = `rides/${targetId}`;
-          method = 'PUT';
-          body = JSON.stringify({ status: 'in_progress' });
-          break;
+        case 'removePassenger': endpoint = `bookings/${targetId}`; method = 'DELETE'; break;
+        case 'cancelRide': endpoint = `rides/${targetId}`; method = 'DELETE'; break;
+        case 'startRide': endpoint = `rides/${targetId}`; method = 'PUT'; body = JSON.stringify({ status: 'in_progress' }); break;
       }
 
       await apiFetch(endpoint, {
         method,
         ...(body ? { body, headers: { 'Content-Type': 'application/json' } } : {})
       });
-
       return true;
     } catch (err) {
       console.error(err);
       return false;
     }
   };
+
   const onTouchStart = (e: React.TouchEvent) => { touchStartY.current = e.touches[0].clientY; };
   const onTouchEnd = (e: React.TouchEvent) => {
     if (touchStartY.current !== null && e.changedTouches[0].clientY - touchStartY.current > 80) close();
@@ -565,12 +410,9 @@ const TripDetailsPanel: React.FC<{
 
   const renderBody = () => {
     switch (trip.status) {
-
-      /* Upcoming User */
       case 'upcomingUser':
         return (
           <>
-            {/* <RouteRow destination={trip.destination ?? 'Destination'}/> */}
             <div className="sheet-details-card">
               <DetailRow label="Driver" value={trip.drivername ?? 'Pending'} />
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
@@ -582,21 +424,16 @@ const TripDetailsPanel: React.FC<{
               <Btn cls="btn-message" icon={Icons.message} label="Message Driver" onClick={() => trip.ride_id && onOpenChat?.(String(trip.ride_id))} />
               <Btn cls="btn-cancel" icon={Icons.cancel} label="Cancel Trip"
                 onClick={() => openModal({
-                  type: 'cancel',
-                  title: 'Cancel this trip?',
-                  body: 'Are you sure you want to cancel your upcoming trip? The driver will be notified.',
-                  actionType: 'cancelBooking',
-                  targetId: trip.id
+                  type: 'cancel', title: 'Cancel this trip?', body: 'Are you sure you want to cancel your upcoming trip? The driver will be notified.',
+                  actionType: 'cancelBooking', targetId: trip.id
                 })} />
             </div>
           </>
         );
 
-      /* Requested  */
       case 'requested':
         return (
           <>
-            {/* <RouteRow destination={trip.destination ?? 'Destination'}/> */}
             <div className="sheet-details-card">
               <DetailRow label="Driver" value={trip.drivername ?? 'Pending'} />
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
@@ -607,17 +444,13 @@ const TripDetailsPanel: React.FC<{
               <Btn cls="btn-message" icon={Icons.message} label="Message Driver" onClick={() => trip.ride_id && onOpenChat?.(String(trip.ride_id))} />
               <Btn cls="btn-cancel" icon={Icons.cancel} label="Cancel Trip"
                 onClick={() => openModal({
-                  type: 'cancel',
-                  title: 'Cancel this request?',
-                  body: 'Are you sure you want to cancel your trip request? The driver will be notified.',
-                  actionType: 'cancelBooking',
-                  targetId: trip.id
+                  type: 'cancel', title: 'Cancel this request?', body: 'Are you sure you want to cancel your trip request? The driver will be notified.',
+                  actionType: 'cancelBooking', targetId: trip.id
                 })} />
             </div>
           </>
         );
 
-      /* Past User */
       case 'pastUser':
         return (
           <>
@@ -627,26 +460,18 @@ const TripDetailsPanel: React.FC<{
               <DetailRow label="Pick Up Time" value={trip.time ?? '—'} />
               <DetailRow label="Arrival Time" value="09:45" />
               <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
-              {trip.rating !== undefined && (
-                <DetailRow label="Your Rating" value={`⭐ ${trip.rating}`} />
-              )}
+              {trip.rating !== undefined && <DetailRow label="Your Rating" value={`⭐ ${trip.rating}`} />}
             </div>
             <div className="sheet-actions">
               <Btn cls="btn-message" icon={Icons.message} label="Message Driver" onClick={() => trip.ride_id && onOpenChat?.(String(trip.ride_id))} />
               {trip.rating === undefined && (
-                <Btn cls="btn-rate" icon={Icons.star} label="Rate Trip"
-                  onClick={() => openModal({
-                    type: 'rating',
-                    target: { name: trip.drivername ?? 'Your Driver', role: 'driver' }
-                  })} />
+                <Btn cls="btn-rate" icon={Icons.star} label="Rate Trip" onClick={() => openModal({ type: 'rating', target: { name: trip.drivername ?? 'Your Driver', role: 'driver' } })} />
               )}
-              <Btn cls="btn-report" icon={Icons.report} label="Report Issue"
-                onClick={() => openModal({ type: 'report' })} />
+              <Btn cls="btn-report" icon={Icons.report} label="Report Issue" onClick={() => openModal({ type: 'report' })} />
             </div>
           </>
         );
 
-      /* Upcoming Driver */
       case 'upcomingDriver':
         return (
           <>
@@ -655,62 +480,35 @@ const TripDetailsPanel: React.FC<{
               <DetailRow label="Departure" value={trip.time ?? '—'} />
               <DetailRow label="Est. Arrival" value="~09:45" />
             </div>
-            <div className="passenger-section-label">
-              Passengers <span className="passenger-count-badge">{passengers.length}</span>
-            </div>
-            <PassengerCarousel
-              passengers={passengers}
-              isPast={false}
-              onRemovePassenger={(p) => openModal({ type: 'remove', passengerName: p.name, bookingId: p.id })}
-              onMessage={(p) => trip.ride_id && onOpenChat?.(String(trip.ride_id), p.profileId)}
-            />
+            <div className="passenger-section-label">Passengers <span className="passenger-count-badge">{passengers.length}</span></div>
+            <PassengerCarousel passengers={passengers} isPast={false} onRemovePassenger={(p) => openModal({ type: 'remove', passengerName: p.name, bookingId: p.id })} onMessage={(p) => trip.ride_id && onOpenChat?.(String(trip.ride_id), p.profileId)} />
             <div className="sheet-actions" style={{ marginTop: 12 }}>
-              <Btn cls="btn-cancel" icon={Icons.cancel} label="Cancel Whole Trip"
-                onClick={() => openModal({
-                  type: 'cancel',
-                  title: 'Cancel whole trip?',
-                  body: 'This will cancel your trip for all passengers. Everyone will be notified.',
-                  actionType: 'cancelRide',
-                  targetId: trip.ride_id!
-                })} />
+              <Btn cls="btn-cancel" icon={Icons.cancel} label="Cancel Whole Trip" onClick={() => openModal({ type: 'cancel', title: 'Cancel whole trip?', body: 'This will cancel your trip for all passengers. Everyone will be notified.', actionType: 'cancelRide', targetId: trip.ride_id! })} />
             </div>
             <div className="sheet-actions" style={{ marginTop: 12 }}>
-              {/* Backend required here to move upcoming into active */}
-              <Btn cls="btn-accept" icon={Icons.accept} label="Begin Ride"
-                onClick={() => openModal({
-                  type: 'start',
-                  title: 'Start whole trip?',
-                  body: 'This will start your trip and notify users.',
-                  targetId: trip.ride_id!
-                })} />
+              <Btn cls="btn-accept" icon={Icons.accept} label="Begin Ride" onClick={() => openModal({ type: 'start', title: 'Start whole trip?', body: 'This will start your trip and notify users.', targetId: trip.ride_id! })} />
             </div>
           </>
         );
 
-      /* Passenger Request */
       case 'passengerRequest':
         return (
           <>
             <div className="sheet-details-card">
               <DetailRow label="Passenger" value={trip.username ?? '—'} />
-              {trip.rating !== undefined && (
-                <DetailRow label="Rating" value={`⭐ ${trip.rating}`} />
-              )}
+              {trip.rating !== undefined && <DetailRow label="Rating" value={`⭐ ${trip.rating}`} />}
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
               <DetailRow label="Drop Off By" value={trip.time ?? '—'} />
               <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
             </div>
             <div className="sheet-actions">
               <Btn cls="btn-message" icon={Icons.message} label="Message Passenger" onClick={() => trip.ride_id && onOpenChat?.(String(trip.ride_id), trip.passenger_profile_id)} />
-              <Btn cls="btn-accept" icon={Icons.accept} label="Accept Request"
-                onClick={() => openModal({ type: 'accept', passengerName: trip.username ?? 'Passenger', bookingId: trip.id })} />
-              <Btn cls="btn-cancel" icon={Icons.cancel} label="Deny Request"
-                onClick={() => openModal({ type: 'deny', passengerName: trip.username ?? 'Passenger', bookingId: trip.id })} />
+              <Btn cls="btn-accept" icon={Icons.accept} label="Accept Request" onClick={() => openModal({ type: 'accept', passengerName: trip.username ?? 'Passenger', bookingId: trip.id })} />
+              <Btn cls="btn-cancel" icon={Icons.cancel} label="Deny Request" onClick={() => openModal({ type: 'deny', passengerName: trip.username ?? 'Passenger', bookingId: trip.id })} />
             </div>
           </>
         );
 
-      /* Past Driver */
       case 'pastDriver':
         return (
           <>
@@ -719,18 +517,10 @@ const TripDetailsPanel: React.FC<{
               <DetailRow label="Departure" value={trip.time ?? '—'} />
               <DetailRow label="Arrival" value="~09:45" />
             </div>
-            <div className="passenger-section-label">
-              Passengers: <span className="passenger-count-badge">{passengers.length}</span>
-            </div>
-            <PassengerCarousel
-              passengers={passengers}
-              isPast={true}
-              onRatePassenger={(p) => openModal({ type: 'rating', target: { name: p.name, role: 'passenger' } })}
-              onMessage={(p) => trip.ride_id && onOpenChat?.(String(trip.ride_id), p.profileId)}
-            />
+            <div className="passenger-section-label">Passengers: <span className="passenger-count-badge">{passengers.length}</span></div>
+            <PassengerCarousel passengers={passengers} isPast={true} onRatePassenger={(p) => openModal({ type: 'rating', target: { name: p.name, role: 'passenger' } })} onMessage={(p) => trip.ride_id && onOpenChat?.(String(trip.ride_id), p.profileId)} />
             <div className="sheet-actions" style={{ marginTop: 12 }}>
-              <Btn cls="btn-report" icon={Icons.report} label="Report Issue"
-                onClick={() => openModal({ type: 'report' })} />
+              <Btn cls="btn-report" icon={Icons.report} label="Report Issue" onClick={() => openModal({ type: 'report' })} />
             </div>
           </>
         );
@@ -742,11 +532,7 @@ const TripDetailsPanel: React.FC<{
   return (
     <>
       <div className={`sheet-overlay${closing ? ' overlay-closing' : ''}`} onClick={close} />
-      <div
-        className={`trip-sheet${closing ? ' sheet-closing' : ''}`}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-      >
+      <div className={`trip-sheet${closing ? ' sheet-closing' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div className="sheet-handle-area"><div className="sheet-handle" /></div>
         <div className="sheet-scroll">
           <div className="sheet-header">
@@ -757,20 +543,9 @@ const TripDetailsPanel: React.FC<{
 
           {trip.ride_id ? (
             <div className="map-container">
-              <RideRenderMap
-                rideId={trip.ride_id}
-                height="220px"
-                interactive={true}
-                existingPickup={
-                  trip.pickup_lat && trip.pickup_lng
-                    ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
-                    : undefined
-                }
-              />
+              <RideRenderMap rideId={trip.ride_id} height="220px" interactive={true} existingPickup={trip.pickup_lat && trip.pickup_lng ? { lat: trip.pickup_lat, lng: trip.pickup_lng } : undefined} />
             </div>
-          ) : (
-            <MapPlaceholder />
-          )}
+          ) : <MapPlaceholder />}
 
           {renderBody()}
           <div style={{ height: 32 }} />
@@ -779,22 +554,12 @@ const TripDetailsPanel: React.FC<{
 
       {modal && (
         <Modal
-          state={modal}
-          onClose={closeModal}
-          onDone={doneModal}
+          state={modal} onClose={closeModal} onDone={doneModal}
           onConfirmAction={async () => {
-            if (modal.type === 'accept' || modal.type === 'deny') {
-              return await handleAction(modal.type, modal.bookingId);
-            }
-            if (modal.type === 'cancel') {
-              return await handleAction(modal.actionType, modal.targetId);
-            }
-            if (modal.type === 'remove') {
-              return await handleAction('removePassenger', modal.bookingId);
-            }
-            if (modal.type === 'start') {
-              return await handleAction('startRide', modal.targetId);
-            }
+            if (modal.type === 'accept' || modal.type === 'deny') { return await handleAction(modal.type, modal.bookingId); }
+            if (modal.type === 'cancel') { return await handleAction(modal.actionType, modal.targetId); }
+            if (modal.type === 'remove') { return await handleAction('removePassenger', modal.bookingId); }
+            if (modal.type === 'start') { return await handleAction('startRide', modal.targetId); }
             return true;
           }}
         />
@@ -803,8 +568,7 @@ const TripDetailsPanel: React.FC<{
   );
 };
 
-
-// Trip Section - What is first seen on activity page
+// Trip Section
 type TripSectionProps = {
   title: string; trips: Trip[]; emptyTitle: string; emptySubtitle: string; emptyIcon: string;
   collapsible?: boolean; mode: 'user' | 'Driver'; onTripMore: (t: Trip) => void; showFilter?: boolean;
@@ -881,21 +645,7 @@ const TripSection: React.FC<TripSectionProps> = ({
   );
 };
 
-
-
-// BACKEND REQUIRED
-// On component mount:
-//
-// - Fetch all trip categories for current user
-// - Use authentication token (JWT/session)
-// - Store in state instead of mock arrays
-//
-// Also handle:
-// - Loading states
-// - Error states
-// - Refresh after actions
-
-// Putting trip sections altogether with titles
+// Activity Page Layout
 type ActivityPageProps = {
   canUseDriverMode: boolean;
   onDriverSignup: () => void;
@@ -908,16 +658,14 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
   const [internalMode, setInternalMode] = useState<'user' | 'Driver'>('user');
   const currentMode = mode ?? internalMode;
   const setCurrentMode = (nextMode: 'user' | 'Driver') => {
-    if (mode === undefined) {
-      setInternalMode(nextMode);
-    }
+    if (mode === undefined) { setInternalMode(nextMode); }
     onModeChange?.(nextMode);
   };
   React.useEffect(() => {
     if (!canUseDriverMode && currentMode === 'Driver') setCurrentMode('user');
   }, [canUseDriverMode, currentMode]);
-  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
 
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [bookings, setBookings] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -928,108 +676,61 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
     try {
       const formatTime = (iso?: string) => {
         if (!iso) return 'Pending';
-
         const date = new Date(iso);
-
-        return date.toLocaleString('en-GB', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+        return date.toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
       };
 
       const formatDateOnly = (iso?: string) => {
         if (!iso) return 'Pending';
         const date = new Date(iso);
-        return date.toLocaleString('en-GB', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-        });
+        return date.toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
       };
 
       const formatTimeOnly = (iso?: string) => {
         if (!iso) return '';
         const date = new Date(iso);
-        return date.toLocaleString('en-GB', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+        return date.toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' });
       };
 
-
-  if (currentMode === 'user') {
+      if (currentMode === 'user') {
         const data = await apiFetch<any>('bookings/me', { method: 'GET' });
-
         const transformed: Trip[] = data.map((b: any) => {
           const rideData = b.ride || {};
-
           return {
-            id: b.id,
-            ride_id: b.ride_id,
-            username: rideData.driver?.first_name ? `${rideData.driver.first_name} ${rideData.driver.last_name}` :
-              b.passenger_name || `User ${b.user_id?.substring(0, 4)}`,
+            id: b.id, ride_id: b.ride_id,
+            username: rideData.driver?.first_name ? `${rideData.driver.first_name} ${rideData.driver.last_name}` : b.passenger_name || `User ${b.user_id?.substring(0, 4)}`,
             destination: b.dropoff_location || rideData.destination || 'Destination',
             time: formatTime(b.pickup_time || rideData.departure_time),
             dateOnly: formatDateOnly(b.pickup_time || rideData.departure_time),
             timeOnly: formatTimeOnly(b.pickup_time || rideData.departure_time),
             price: `£2.00`,
-            status: b.status === 'pending' ? 'requested' :
-              b.status === 'confirmed' ? (rideData.status === 'in_progress' ? 'activeUser' : 'upcomingUser') :
-                b.status === 'completed' ? 'pastUser' : 'cancelled',
-            action: 'More',
-            pickup_lat: b.pickup_lat,
-            pickup_lng: b.pickup_lng
+            status: b.status === 'pending' ? 'requested' : b.status === 'confirmed' ? (rideData.status === 'in_progress' ? 'activeUser' : 'upcomingUser') : b.status === 'completed' ? 'pastUser' : 'cancelled',
+            action: 'More', pickup_lat: b.pickup_lat, pickup_lng: b.pickup_lng
           };
         }).filter((t: Trip) => t.status !== 'cancelled');
         setBookings(transformed);
       } else {
         const ridesData = await apiFetch<any>('rides/driver/dashboard', { method: 'GET' });
-
         const finalDriverActivities: Trip[] = [];
         ridesData.forEach((ride: any) => {
           finalDriverActivities.push({
-            id: ride.id,
-            ride_id: ride.id,
-            destination: ride.destination,
-            time: formatTime(ride.departure_time),
-            dateOnly: formatDateOnly(ride.departure_time),
-            timeOnly: formatTimeOnly(ride.departure_time),
-            status: ride.status === 'completed' ? 'pastDriver' :
-              ride.status === 'in_progress' ? 'activeDriver' : 'upcomingDriver',
-            action: 'More',
-            numberPassengers: ride.seats_total - ride.seats_available,
-            passengers: ride.bookings
-              .filter((b: any) => b.status === 'confirmed')
-              .map((b: any) => ({
-                id: b.id,
-                profileId: b.passenger?.id ?? b.passenger_id,
-                name: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown',
-                rating: b.passenger?.rider_rating,
-                pickupLocation: b.pickup_location,
-                cost: `£2.00`,
-                rated: false
+            id: ride.id, ride_id: ride.id, destination: ride.destination,
+            time: formatTime(ride.departure_time), dateOnly: formatDateOnly(ride.departure_time), timeOnly: formatTimeOnly(ride.departure_time),
+            status: ride.status === 'completed' ? 'pastDriver' : ride.status === 'in_progress' ? 'activeDriver' : 'upcomingDriver',
+            action: 'More', numberPassengers: ride.seats_total - ride.seats_available,
+            passengers: ride.bookings.filter((b: any) => b.status === 'confirmed').map((b: any) => ({
+                id: b.id, profileId: b.passenger?.id ?? b.passenger_id, name: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown',
+                rating: b.passenger?.rider_rating, pickupLocation: b.pickup_location, cost: `£2.00`, rated: false
               }))
           });
 
           ride.bookings.forEach((b: any) => {
             if (b.status === 'pending') {
               finalDriverActivities.push({
-                id: b.id,
-                ride_id: ride.id,
-                passenger_profile_id: b.passenger?.id ?? b.passenger_id,
-                username: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown Passenger',
-                destination: b.dropoff_location,
-                time: formatTime(b.pickup_time || ride.departure_time),
-                dateOnly: formatDateOnly(b.pickup_time || ride.departure_time),
-                timeOnly: formatTimeOnly(b.pickup_time || ride.departure_time),
-                price: `£2.00`,
-                status: 'passengerRequest',
-                action: 'More',
-                pickup_lat: b.pickup_lat,
-                pickup_lng: b.pickup_lng
+                id: b.id, ride_id: ride.id, passenger_profile_id: b.passenger?.id ?? b.passenger_id,
+                username: b.passenger ? `${b.passenger.first_name} ${b.passenger.last_name}` : 'Unknown Passenger', destination: b.dropoff_location,
+                time: formatTime(b.pickup_time || ride.departure_time), dateOnly: formatDateOnly(b.pickup_time || ride.departure_time), timeOnly: formatTimeOnly(b.pickup_time || ride.departure_time),
+                price: `£2.00`, status: 'passengerRequest', action: 'More', pickup_lat: b.pickup_lat, pickup_lng: b.pickup_lng
               });
             }
           });
@@ -1044,11 +745,8 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
     }
   };
 
-  React.useEffect(() => {
-    fetchActivity();
-  }, [currentMode]);
+  React.useEffect(() => { fetchActivity(); }, [currentMode]);
 
-  // Filter combined activity based on role and status
   const driverRequests = bookings.filter(b => b.status === 'passengerRequest');
   const driverUpcoming = bookings.filter(b => b.status === 'upcomingDriver');
   const driverPast = bookings.filter(b => b.status === 'pastDriver');
@@ -1063,48 +761,27 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
         <h1 className="activity-title">Activity</h1>
         <div className="top-toggle">
           <button className={`toggle-tab ${currentMode === 'user' ? 'toggle-tab-active' : ''}`} onClick={() => setCurrentMode('user')}>Rider</button>
-          <button
-            className={`toggle-tab ${currentMode === 'Driver' ? 'toggle-tab-active' : ''}`}
-            onClick={() => {
-              if (!canUseDriverMode) return onDriverSignup();
-              setCurrentMode('Driver');
-            }}
-          >
-            Driver
-          </button>
+          <button className={`toggle-tab ${currentMode === 'Driver' ? 'toggle-tab-active' : ''}`} onClick={() => { if (!canUseDriverMode) return onDriverSignup(); setCurrentMode('Driver'); }}>Driver</button>
         </div>
       </header>
 
       {loading && <p style={{ padding: '20px' }}>Loading activities...</p>}
-      {error && <p style={{ padding: '20px', color: '#f87171' }}>Error: {error}</p>}
+      {error && <p style={{ padding: '20px', color: '#ff9999', fontWeight: 'bold' }}>Error: {error}</p>}
 
       {!loading && (
         <>
-          <TripSection title="Upcoming" trips={currentMode === 'user' ? riderUpcoming : driverUpcoming}
-            emptyTitle="You have no upcoming trips" emptySubtitle="Reserve your trip →" emptyIcon="📅"
-            collapsible mode={currentMode} onTripMore={setSelectedTrip} />
-
+          <TripSection title="Upcoming" trips={currentMode === 'user' ? riderUpcoming : driverUpcoming} emptyTitle="You have no upcoming trips" emptySubtitle="Reserve your trip →" emptyIcon="📅" collapsible mode={currentMode} onTripMore={setSelectedTrip} />
           {currentMode === 'user' ? (
-            <TripSection title="Requested" trips={riderRequested}
-              emptyTitle="You have no requested trips" emptySubtitle="Book a reservation →" emptyIcon="🗓️"
-              collapsible mode={currentMode} onTripMore={setSelectedTrip} />
+            <TripSection title="Requested" trips={riderRequested} emptyTitle="You have no requested trips" emptySubtitle="Book a reservation →" emptyIcon="🗓️" collapsible mode={currentMode} onTripMore={setSelectedTrip} />
           ) : (
-            <TripSection title="Passenger Requests" trips={driverRequests}
-              emptyTitle="You have no requests" emptySubtitle="Soon your ride will be booked" emptyIcon="🗓️"
-              collapsible mode={currentMode} onTripMore={setSelectedTrip} showFilter />
+            <TripSection title="Passenger Requests" trips={driverRequests} emptyTitle="You have no requests" emptySubtitle="Soon your ride will be booked" emptyIcon="🗓️" collapsible mode={currentMode} onTripMore={setSelectedTrip} showFilter />
           )}
-
-          <TripSection title="Past" trips={currentMode === 'user' ? riderPast : driverPast}
-            emptyTitle="No past trips yet" emptySubtitle="Your completed rides will appear here" emptyIcon="🕘"
-            collapsible mode={currentMode} onTripMore={setSelectedTrip} />
+          <TripSection title="Past" trips={currentMode === 'user' ? riderPast : driverPast} emptyTitle="No past trips yet" emptySubtitle="Your completed rides will appear here" emptyIcon="🕘" collapsible mode={currentMode} onTripMore={setSelectedTrip} />
         </>
       )}
 
       {selectedTrip && (
-        <TripDetailsPanel trip={selectedTrip} mode={currentMode} onClose={() => {
-          setSelectedTrip(null);
-          fetchActivity(); // Refresh after potentially accepting/denying
-        }} onOpenChat={onOpenChat} onRideStarted={onRideStarted} />
+        <TripDetailsPanel trip={selectedTrip} mode={currentMode} onClose={() => { setSelectedTrip(null); fetchActivity(); }} onOpenChat={onOpenChat} onRideStarted={onRideStarted} />
       )}
     </>
   );
