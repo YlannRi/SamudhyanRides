@@ -28,16 +28,16 @@ const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, partic
   // Format departure time
   const departureDate = new Date(ride.departure_time || trip.pickup_time);
   let timeOfArrival = isNaN(departureDate.getTime()) ? 'Pending' : departureDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  
+
   // Try to use calculated pickup time if routeData is available
   if (routeData && routeData.times && routeData.times.pickups) {
-      const myPickup = routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id));
-      if (myPickup && myPickup.estimated_time) {
-          const dt = new Date(myPickup.estimated_time);
-          if (!isNaN(dt.getTime())) {
-              timeOfArrival = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          }
+    const myPickup = routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id));
+    if (myPickup && myPickup.estimated_time) {
+      const dt = new Date(myPickup.estimated_time);
+      if (!isNaN(dt.getTime())) {
+        timeOfArrival = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       }
+    }
   }
 
   return (
@@ -48,7 +48,7 @@ const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, partic
           {trips.map((t, i) => (
             <button
               key={t.id}
-              className={`passenger-tab ${i === activeTripIdx ? 'passenger-tab-active' : ''}`}
+              className={`passenger-tab ${i !== activeTripIdx ? 'passenger-tab-active' : ''}`}
               onClick={() => setActiveTripIdx(i)}
             >
               Ride #{t.ride_id}
@@ -72,10 +72,10 @@ const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, partic
 
       {/* Map */}
       <div style={{ marginBottom: '16px' }}>
-        <RideRenderMap 
-          rideId={trip.ride_id} 
-          height="300px" 
-          interactive={true} 
+        <RideRenderMap
+          rideId={trip.ride_id}
+          height="300px"
+          interactive={true}
           onRouteData={setRouteData}
           existingPickup={
             trip.pickup_lat && trip.pickup_lng
@@ -156,7 +156,7 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
           {rides.map((r, i) => (
             <button
               key={r.id}
-              className={`passenger-tab ${i === activeRideIdx ? 'passenger-tab-active' : ''}`}
+              className={`passenger-tab ${i !== activeRideIdx ? 'passenger-tab-active' : ''}`}
               onClick={() => {
                 setActiveRideIdx(i);
                 setCurrentPassIdx(0); // Reset passenger index on ride change
@@ -172,10 +172,10 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
       <div className="journey-driver-mode-header">
         <div className="journey-mode-sub">Pick Up Order</div>
         {routeData && routeData.times && routeData.times.driver_leave && (
-           <div className="journey-arriving-badge" style={{marginTop: '8px', display: 'inline-flex'}}>
-             {Icons.clock}
-             <span>Leave By {new Date(routeData.times.driver_leave).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-           </div>
+          <div className="journey-arriving-badge" style={{ marginTop: '8px', display: 'inline-flex' }}>
+            {Icons.clock}
+            <span>Leave By {new Date(routeData.times.driver_leave).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
         )}
       </div>
 
@@ -188,7 +188,7 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
             return (
               <button
                 key={b.id}
-                className={`passenger-tab${i === currentPassIdx ? ' passenger-tab-active' : ''}${isDone ? ' passenger-tab-done' : ''}`}
+                className={`passenger-tab${i !== currentPassIdx ? ' passenger-tab-active' : ''}${isDone ? ' passenger-tab-done' : ''}`}
                 onClick={() => setCurrentPassIdx(i)}
               >
                 {passName.split(' ')[0]}
@@ -205,14 +205,14 @@ const DriverJourney: React.FC<{ rides: any[], onComplete: (rideId: number) => vo
 
       {/* Map */}
       <div style={{ marginBottom: '16px', marginTop: '16px' }}>
-        <RideRenderMap 
-           rideId={activeRide.id} 
-           height="300px" 
-           interactive={true} 
-           refreshTrigger={refreshTrigger} 
-           driverMode={true}
-           confirmedPickupIds={Array.from(confirmedPickups)}
-           onRouteData={setRouteData}
+        <RideRenderMap
+          rideId={activeRide.id}
+          height="300px"
+          interactive={true}
+          refreshTrigger={refreshTrigger}
+          driverMode={true}
+          confirmedPickupIds={Array.from(confirmedPickups)}
+          onRouteData={setRouteData}
         />
       </div>
 

@@ -237,24 +237,24 @@ const Modal: React.FC<{
           </div>
         ) : inner.type === 'rating' ? (
           <RatingUI target={inner.target} onSubmit={async (stars) => {
-              try {
-                const params = new URLSearchParams({
-                  ride_id: String(inner.rideId),
-                  reviewed_user_id: inner.reviewedUserId,
-                  rating: String(stars),
-                });
-                await apiFetch(`ratings/?${params.toString()}`, { method: 'POST' });
-                succeed('⭐', 'Rating Submitted!', 'Thanks for your feedback');
-              } catch (err: any) {
-                // Still show success on duplicate (already rated) to avoid confusion
-                const status = err?.status ?? err?.response?.status;
-                if (status === 409) {
-                  succeed('⭐', 'Already Rated', 'You have already rated this person for this ride');
-                } else {
-                  succeed('⚠️', 'Could not submit', err?.message || 'Something went wrong');
-                }
+            try {
+              const params = new URLSearchParams({
+                ride_id: String(inner.rideId),
+                reviewed_user_id: inner.reviewedUserId,
+                rating: String(stars),
+              });
+              await apiFetch(`ratings/?${params.toString()}`, { method: 'POST' });
+              succeed('⭐', 'Rating Submitted!', 'Thanks for your feedback');
+            } catch (err: any) {
+              // Still show success on duplicate (already rated) to avoid confusion
+              const status = err?.status ?? err?.response?.status;
+              if (status === 409) {
+                succeed('⭐', 'Already Rated', 'You have already rated this person for this ride');
+              } else {
+                succeed('⚠️', 'Could not submit', err?.message || 'Something went wrong');
               }
-            }} onClose={onClose} />
+            }
+          }} onClose={onClose} />
         ) : inner.type === 'report' ? (
           <ReportUI onSubmit={() => succeed('✅', 'Report Sent', 'Thanks for letting us know — we\'ll look into it')} onClose={onClose} />
         ) : inner.type === 'cancel' ? (
@@ -351,7 +351,7 @@ const PassengerCarousel: React.FC<{
         <div className="passenger-tabs">
           {passengers.map((pass, i) => (
             <button key={pass.id}
-              className={`passenger-tab${i === idx ? ' passenger-tab-active' : ''}`}
+              className={`passenger-tab${i !== idx ? ' passenger-tab-active' : ''}`}
               onClick={() => setIdx(i)}>
               {pass.name.split(' ')[0]}
             </button>
@@ -461,13 +461,13 @@ const TripDetailsPanel: React.FC<{
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
               <DetailRow label="Date & Arrival" value={trip.time ?? '—'} />
               {routeData?.times ? (
-                 <DetailRow label="Estimated Pickup" value={
-                    routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id))?.estimated_time 
+                <DetailRow label="Estimated Pickup" value={
+                  routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id))?.estimated_time
                     ? new Date(routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id)).estimated_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                     : "Pending"
-                 } />
+                } />
               ) : (
-                 <DetailRow label="Estimated Pickup" value="Pending" />
+                <DetailRow label="Estimated Pickup" value="Pending" />
               )}
               <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
             </div>
@@ -490,13 +490,13 @@ const TripDetailsPanel: React.FC<{
               <DetailRow label="Destination" value={trip.destination ?? '—'} />
               <DetailRow label="Be There For" value={trip.time ?? '—'} />
               {routeData?.times ? (
-                 <DetailRow label="Estimated Pickup" value={
-                    routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id))?.estimated_time 
+                <DetailRow label="Estimated Pickup" value={
+                  routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id))?.estimated_time
                     ? new Date(routeData.times.pickups.find((p: any) => p.booking_ids && p.booking_ids.includes(trip.id)).estimated_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                     : "Pending"
-                 } />
+                } />
               ) : (
-                 <DetailRow label="Estimated Pickup" value="Pending" />
+                <DetailRow label="Estimated Pickup" value="Pending" />
               )}
               <DetailRow label="Cost" value="£2.00" valueClass="detail-price" />
             </div>
@@ -667,7 +667,7 @@ const TripSection: React.FC<TripSectionProps> = ({
   title, trips, emptyTitle, emptySubtitle, emptyIcon, collapsible = false, onTripMore, showFilter,
 }) => {
   const [expanded, setExpanded] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState('Cost');
+  const [selectedFilter, setSelectedFilter] = useState('Rating');
   const [filterOpen, setFilterOpen] = useState(false);
   const visible = collapsible && !expanded ? trips.slice(0, 3) : trips;
 
@@ -680,7 +680,7 @@ const TripSection: React.FC<TripSectionProps> = ({
             <button className="filter-button" onClick={() => setFilterOpen(o => !o)}>{selectedFilter} ▾</button>
             {filterOpen && (
               <div className="filter-dropdown">
-                {['Cost', 'Rating', 'Ease'].map(opt => (
+                {['Rating', 'Ease'].map(opt => (
                   <div key={opt} className="filter-option" onClick={() => { setSelectedFilter(opt); setFilterOpen(false); }}>{opt}</div>
                 ))}
               </div>
@@ -700,7 +700,7 @@ const TripSection: React.FC<TripSectionProps> = ({
       ) : (
         <>
           <div className="past-list">
-            {visible.map(trip => (
+            {visible.slice().reverse().map(trip => (
               <div key={trip.id} className="card trip-row-card">
                 <div className="trip-row-left">
                   <div className="trip-car-icon">🚗</div>
