@@ -15,9 +15,12 @@ describe('TimetablePage Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -55,6 +58,33 @@ describe('TimetablePage Component', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('University timetable iCal URL')).toHaveValue('https://bath.ac.uk/account-feed.ics');
+    });
+  });
+
+  it('persists the remembered timetable URL to the account without needing to load events', async () => {
+    window.localStorage.setItem('authToken', 'fake-token');
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce([{ calendar_link: null }])
+      .mockResolvedValueOnce({ calendar_link: 'https://bath.ac.uk/device-sync.ics' });
+
+    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith('users/me', { method: 'GET' });
+    });
+
+    fireEvent.change(screen.getByLabelText('University timetable iCal URL'), {
+      target: { value: 'https://bath.ac.uk/device-sync.ics' },
+    });
+
+    vi.advanceTimersByTime(450);
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith('users/me/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calendar_link: 'https://bath.ac.uk/device-sync.ics' }),
+      });
     });
   });
 

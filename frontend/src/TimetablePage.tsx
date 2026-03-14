@@ -43,6 +43,7 @@ const TimetablePage: React.FC<Props> = ({ onBack, onSelectEvent }) => {
   const [events, setEvents] = useState<TimetableEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -66,6 +67,10 @@ const TimetablePage: React.FC<Props> = ({ onBack, onSelectEvent }) => {
         }
       } catch (fetchError) {
         console.error('Error fetching saved calendar link:', fetchError);
+      } finally {
+        if (!ignore) {
+          setPreferencesLoaded(true);
+        }
       }
     };
 
@@ -93,6 +98,37 @@ const TimetablePage: React.FC<Props> = ({ onBack, onSelectEvent }) => {
     }
   };
 
+  useEffect(() => {
+    const trimmed = url.trim();
+
+    if (rememberUrl) {
+      if (trimmed) {
+        localStorage.setItem('timetableUrl', trimmed);
+      } else {
+        localStorage.removeItem('timetableUrl');
+      }
+    } else {
+      localStorage.removeItem('timetableUrl');
+    }
+  }, [rememberUrl, url]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (!token || !preferencesLoaded) {
+      return;
+    }
+
+    const trimmed = url.trim();
+    const nextCalendarLink = rememberUrl && trimmed ? trimmed : null;
+    const timeoutId = window.setTimeout(() => {
+      void persistCalendarLink(nextCalendarLink);
+    }, 400);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [preferencesLoaded, rememberUrl, url]);
+
   const loadEvents = async () => {
     setLoading(true);
     setError(null);
@@ -105,14 +141,6 @@ const TimetablePage: React.FC<Props> = ({ onBack, onSelectEvent }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: trimmed, scope }),
       });
-
-      if (rememberUrl) {
-        localStorage.setItem('timetableUrl', trimmed);
-        void persistCalendarLink(trimmed);
-      } else {
-        localStorage.removeItem('timetableUrl');
-        void persistCalendarLink(null);
-      }
 
       setEvents(Array.isArray(data) ? data : []);
     } catch (e: unknown) {
