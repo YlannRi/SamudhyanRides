@@ -15,6 +15,9 @@ class RegisterRequest(BaseModel):
     password: str
     full_name: str
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
 # auth.py (inside the register function)
 @router.post("/register")
 def register(request: RegisterRequest):
@@ -100,6 +103,23 @@ def login(request: LoginRequest):
             "token_type": "bearer" # this is the JWT token
         }
 
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+@router.post("/refresh")
+def refresh(request: RefreshRequest):
+    auth_client = create_supabase_client()
+    try:
+        response = auth_client.auth.refresh_session(request.refresh_token)
+        if response.session is None:
+            raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+        return {
+            "access_token": response.session.access_token,
+            "refresh_token": response.session.refresh_token,
+            "token_type": "bearer",
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
 
