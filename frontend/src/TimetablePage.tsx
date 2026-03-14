@@ -11,6 +11,7 @@ export type TimetableEvent = {
 };
 
 export type RidePrefill = {
+  origin?: string;
   destination: string;
   arrivalDateTimeLocal?: string; // yyyy-mm-ddThh:mm
 };
