@@ -75,7 +75,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
 
             if (mode === 'login') {
                 if (data.access_token || data.token) {
-                    setAuthToken(data.access_token || data.token);
+                    setAuthToken(data.access_token || data.token, data.refresh_token);
                     if (onAuthSuccess) onAuthSuccess();
                 } else {
                     throw new Error('Invalid login credentials.');
@@ -116,7 +116,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onAuthSuccess, onStartDriverSignu
                         const token = loginRes?.access_token || loginRes?.token;
                         if (!token) throw new Error('Auto-login failed: missing token');
 
-                        setAuthToken(token);
+                        setAuthToken(token, loginRes?.refresh_token);
                         setSuccessMessage('Account created! Complete driver signup.');
                         onStartDriverSignup?.(draft);
                         return;

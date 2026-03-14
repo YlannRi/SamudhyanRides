@@ -1,4 +1,5 @@
 const LS_KEY = "authToken";
+const LS_REFRESH_KEY = "refreshToken";
 const COOKIE_KEY = "authToken";
 
 function setCookie(name: string, value: string, maxAgeSeconds = 60 * 60 * 24 * 7) {
@@ -29,12 +30,20 @@ export function getAuthToken(): string | null {
   return null;
 }
 
-export function setAuthToken(token: string) {
+export function setAuthToken(token: string, refreshToken?: string) {
   localStorage.setItem(LS_KEY, token);
   setCookie(COOKIE_KEY, token);
+  if (refreshToken) {
+    localStorage.setItem(LS_REFRESH_KEY, refreshToken);
+  }
 }
 
 export function clearAuthToken() {
   localStorage.removeItem(LS_KEY);
+  localStorage.removeItem(LS_REFRESH_KEY);
   deleteCookie(COOKIE_KEY);
+}
+
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(LS_REFRESH_KEY);
 }

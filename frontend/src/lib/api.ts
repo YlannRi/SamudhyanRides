@@ -1,5 +1,5 @@
 // src/api.ts
-import { clearAuthToken } from "./authToken";
+import { clearAuthToken, getAuthToken, getRefreshToken, setAuthToken } from "./authToken";
 
 const RAW_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined;
 const PROD_API_BASE_URL = 'https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io';
@@ -91,6 +91,45 @@ export type ApiFetchOptions = Omit<RequestInit, "headers"> & {
   auth?: boolean; // attach Bearer token from localStorage
 };
 
+let isRefreshing = false;
+let refreshQueue: Array<(token: string | null) => void> = [];
+
+async function tryRefreshToken(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+
+  if (isRefreshing) {
+    // Queue concurrent callers while refresh is in flight.
+    return new Promise((resolve) => refreshQueue.push(resolve));
+  }
+
+  isRefreshing = true;
+  try {
+    const res = await fetch(buildApiUrl("auth/refresh"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!res.ok) throw new Error("Refresh failed");
+
+    const data = await res.json();
+    const newToken = data?.access_token || data?.token;
+    if (!newToken) throw new Error("Refresh failed: missing access token");
+
+    setAuthToken(newToken, data?.refresh_token ?? refreshToken);
+    refreshQueue.forEach((cb) => cb(newToken));
+    return newToken;
+  } catch {
+    clearAuthToken();
+    refreshQueue.forEach((cb) => cb(null));
+    return null;
+  } finally {
+    isRefreshing = false;
+    refreshQueue = [];
+  }
+}
+
 export async function apiFetch<T = any>(path: string, opts: ApiFetchOptions = {}): Promise<T> {
   const url = buildApiUrl(path);
 
@@ -100,14 +139,24 @@ export async function apiFetch<T = any>(path: string, opts: ApiFetchOptions = {}
 
   // Attach token automatically unless auth:false
   if (opts.auth !== false) {
-    const token = localStorage.getItem("authToken");
+    const token = getAuthToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(url, { ...opts, headers });
+  let res = await fetch(url, { ...opts, headers });
+
+  if (res.status === 401 && opts.auth !== false) {
+    const newToken = await tryRefreshToken();
+    if (newToken) {
+      const retryHeaders: Record<string, string> = {
+        ...headers,
+        Authorization: `Bearer ${newToken}`,
+      };
+      res = await fetch(url, { ...opts, headers: retryHeaders });
+    }
+  }
 
   // Try to parse error body for nicer messages
-    // Try to parse error body for nicer messages (and preserve structured error detail)
   if (!res.ok) {
     if (res.status === 401) {
       clearAuthToken();
