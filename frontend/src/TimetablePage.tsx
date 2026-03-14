@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from './lib/api';
+import { getProfileRecord } from './lib/profilePreferences';
 
 export type TimetableEvent = {
   uid: string;
@@ -44,12 +45,53 @@ const TimetablePage: React.FC<Props> = ({ onBack, onSelectEvent }) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let ignore = false;
     const saved = localStorage.getItem('timetableUrl');
-    if (saved && !url) setUrl(saved);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (saved) setUrl(saved);
+
+    const token = localStorage.getItem('authToken');
+    if (!token) return () => { ignore = true; };
+
+    const loadSavedCalendarLink = async () => {
+      try {
+        const data = await apiFetch('users/me', { method: 'GET' });
+        const profile = getProfileRecord(data);
+        const calendarLink = typeof profile?.calendar_link === 'string'
+          ? profile.calendar_link.trim()
+          : '';
+
+        if (!ignore && calendarLink) {
+          setUrl(calendarLink);
+          localStorage.setItem('timetableUrl', calendarLink);
+        }
+      } catch (fetchError) {
+        console.error('Error fetching saved calendar link:', fetchError);
+      }
+    };
+
+    void loadSavedCalendarLink();
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const scope = useMemo(() => (dayOnly ? 'day' : 'week'), [dayOnly]);
+
+  const persistCalendarLink = async (calendarLink: string | null) => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+
+    try {
+      await apiFetch('users/me/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calendar_link: calendarLink }),
+      });
+    } catch (saveError) {
+      console.error('Error saving calendar link:', saveError);
+    }
+  };
 
   const loadEvents = async () => {
     setLoading(true);
@@ -58,13 +100,19 @@ const TimetablePage: React.FC<Props> = ({ onBack, onSelectEvent }) => {
       const trimmed = url.trim();
       if (!trimmed) throw new Error('Please paste your university timetable iCal URL.');
 
-      if (rememberUrl) localStorage.setItem('timetableUrl', trimmed);
-
       const data = await apiFetch<TimetableEvent[]>('timetable/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: trimmed, scope }),
       });
+
+      if (rememberUrl) {
+        localStorage.setItem('timetableUrl', trimmed);
+        void persistCalendarLink(trimmed);
+      } else {
+        localStorage.removeItem('timetableUrl');
+        void persistCalendarLink(null);
+      }
 
       setEvents(Array.isArray(data) ? data : []);
     } catch (e: unknown) {

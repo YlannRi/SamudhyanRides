@@ -1,36 +1,10 @@
-# routers/me.py
-
 from fastapi import APIRouter, Depends, HTTPException, status
-from supabase import create_client, Client  # pip install supabase
-from pydantic import EmailStr
 
-from app.accounts.validation import (
-    UserProfileCreate,
-    UserProfileUpdate,
-    UserProfileOut,
-)
-
-SUPABASE_URL = "https://lbirnrtmclxfgavwhcjo.supabase.co"
-SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiaXJucnRtY2x4ZmdhdndoY2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4ODkzNDYsImV4cCI6MjA4NjQ2NTM0Nn0.rfkUUmnxgvbOk_aaG8o_jdSa63QdS6zRGRITozRnJwY"
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+from app.accounts.database import supabase
+from app.accounts.dependencies import get_current_user
+from app.accounts.validation import UserProfileCreate, UserProfileOut, UserProfileUpdate
 
 router = APIRouter(prefix="/me", tags=["user"])
-
-
-def get_current_user():
-    """
-    Dependency that validates the Supabase JWT and returns claims.
-
-    Example output:
-    {
-        "sub": "<auth_user_id>",
-        "email": "user@example.com",
-        ...
-    }
-
-    """
-    raise NotImplementedError
 
 
 @router.get("/profile", response_model=UserProfileOut)
@@ -45,35 +19,30 @@ def get_my_profile(current_user=Depends(get_current_user)):
         .execute()
     )
 
-    if result.error:
+    if not result.data:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     return result.data
 
 
-@router.post(
-    "/profile",
-    response_model=UserProfileOut,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/profile", response_model=UserProfileOut, status_code=status.HTTP_201_CREATED)
 def create_my_profile(
     profile: UserProfileCreate,
     current_user=Depends(get_current_user),
 ):
     auth_user_id = current_user["sub"]
-    email: EmailStr = current_user["email"]
+    email = current_user["email"]
 
-    # IMPORTANT: auth_user_id + email come from token, not from client body
     insert_data = {
         "auth_user_id": auth_user_id,
         "email": email,
-        **profile.dict(exclude_unset=True),
+        **profile.model_dump(exclude_unset=True),
     }
 
     result = supabase.table("user_profiles").insert(insert_data).execute()
 
-    if result.error:
-        raise HTTPException(status_code=400, detail=result.error.message)
+    if not result.data:
+        raise HTTPException(status_code=400, detail="Could not create profile")
 
     return result.data[0]
 
@@ -85,7 +54,7 @@ def update_my_profile(
 ):
     auth_user_id = current_user["sub"]
 
-    update_data = updates.dict(exclude_unset=True)
+    update_data = updates.model_dump(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
 
@@ -96,21 +65,14 @@ def update_my_profile(
         .execute()
     )
 
-    if result.error or not result.data:
+    if not result.data:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     return result.data[0]
 
 
-@router.delete(
-    "/profile",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
+@router.delete("/profile", status_code=status.HTTP_204_NO_CONTENT)
 def deactivate_my_profile(current_user=Depends(get_current_user)):
-    """
-    Soft delete: mark is_active = false but keep record
-    (supports storage-limitation policy with periodic purges).
-    """
     auth_user_id = current_user["sub"]
 
     result = (
@@ -120,7 +82,7 @@ def deactivate_my_profile(current_user=Depends(get_current_user)):
         .execute()
     )
 
-    if result.error or not result.data:
+    if not result.data:
         raise HTTPException(status_code=404, detail="Profile not found")
 
     return

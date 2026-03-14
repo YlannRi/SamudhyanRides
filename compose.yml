@@ -5,7 +5,5 @@ services:
     container_name: samudhyan_backend
     ports:
       - "8000:8000"
-    env_file: .env.dev
+    env_file: .env
     restart: unless-stopped
-    volumes:
-      - ./backend:/app   

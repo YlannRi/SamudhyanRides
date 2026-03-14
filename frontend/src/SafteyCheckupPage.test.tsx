@@ -1,6 +1,11 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SafetyCheckupPage from './SafetyCheckupPage';
+import { apiFetch } from './lib/api';
+
+vi.mock('./lib/api', () => ({
+  apiFetch: vi.fn(),
+}));
 
 describe('SafetyCheckupPage Component', () => {
   const mockOnBack = vi.fn();
@@ -134,6 +139,24 @@ describe('SafetyCheckupPage Component', () => {
     expect(savedContacts).toHaveLength(1);
     expect(savedContacts[0].firstName).toBe('John');
     expect(savedContacts[0].isPrimary).toBe(true);
+  });
+
+  it('loads trusted contacts from the account profile when available', async () => {
+    window.localStorage.setItem('authToken', 'fake-token');
+    vi.mocked(apiFetch).mockResolvedValueOnce([
+      {
+        trusted_contacts: [
+          { id: '1', firstName: 'Amy', lastName: 'Pond', phone: '07123456789', isPrimary: true },
+        ],
+      },
+    ]);
+
+    render(<SafetyCheckupPage onBack={mockOnBack} />);
+    fireEvent.click(screen.getByText('Trusted contacts'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Amy Pond')).toBeInTheDocument();
+    });
   });
 
   it('disables the Add Contact button if required fields are missing', () => {

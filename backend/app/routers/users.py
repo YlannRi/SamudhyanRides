@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.accounts.database import supabase
-from app.accounts.dependencies import get_current_user
+from app.accounts.dependencies import get_current_user, require_admin_user
+from app.accounts.validation import UserPreferencesUpdate
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -74,6 +75,30 @@ def update_my_profile(
     return result.data[0]
 
 
+@router.put("/me/preferences")
+def update_my_preferences(
+    payload: UserPreferencesUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    auth_user_id = current_user["sub"]
+    update_data = payload.model_dump(exclude_unset=True)
+
+    if "calendar_link" in update_data:
+        calendar_link = update_data["calendar_link"]
+        update_data["calendar_link"] = calendar_link.strip() if isinstance(calendar_link, str) else None
+        if update_data["calendar_link"] == "":
+            update_data["calendar_link"] = None
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No preferences to update")
+
+    result = supabase.table("user_profiles").update(update_data).eq("auth_user_id", auth_user_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    return result.data[0]
+
+
 @router.delete("/me")
 def deactivate_my_profile(current_user: dict = Depends(get_current_user)):
     auth_user_id = current_user["sub"]
@@ -97,8 +122,10 @@ def get_public_user_profile(user_id: str, current_user: dict = Depends(get_curre
 
 
 @router.get("/")
-def get_all_users(current_user: dict = Depends(get_current_user)):
-    response = supabase.table("user_profiles").select("*").execute()
+def get_all_users(current_user: dict = Depends(require_admin_user)):
+    response = supabase.table("user_profiles").select(
+        "id, first_name, last_name, university_username, driver_rating, rider_rating"
+    ).execute()
     return response.data
 
  # havent actually tested update, deactivate or get public user profile

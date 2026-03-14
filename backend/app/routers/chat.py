@@ -1,4 +1,4 @@
-from collections import defaultdict
+import asyncio
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, Query
@@ -184,8 +184,63 @@ def post_message(
 
 # ── WebSocket ──────────────────────────────────────────────────
 
-# Active connections keyed by ride_id + passenger_id
-_connections: dict[str, list[tuple[str, WebSocket]]] = defaultdict(list)
+def _serialize_chat_message(message: dict, sender_name: str) -> dict:
+    return {
+        "id": message["id"],
+        "chat_id": message["chat_id"],
+        "sender_id": message["sender_id"],
+        "sender_name": sender_name,
+        "message": message["message"],
+        "created_at": message["created_at"],
+        "read": message.get("read", False),
+    }
+
+
+def _get_chat_id(ride_id: str, passenger_id: str) -> str | None:
+    chat = supabase.table("ride_chats").select("id").eq("ride_id", ride_id).eq("passenger_id", passenger_id).execute()
+    if not chat.data:
+        return None
+    return chat.data[0]["id"]
+
+
+def _get_messages_with_names(chat_id: str) -> list[dict]:
+    messages = supabase.table("ride_messages") \
+        .select("*") \
+        .eq("chat_id", chat_id) \
+        .order("created_at") \
+        .execute()
+
+    sender_ids = list({m["sender_id"] for m in (messages.data or [])})
+    names_map: dict[str, str] = {}
+    if sender_ids:
+        profiles = supabase.table("user_profiles") \
+            .select("id, first_name, last_name") \
+            .in_("id", sender_ids) \
+            .execute()
+        names_map = {p["id"]: f"{p['first_name']} {p['last_name']}" for p in profiles.data}
+
+    return [
+        _serialize_chat_message(message, names_map.get(message["sender_id"], "Unknown"))
+        for message in (messages.data or [])
+    ]
+
+
+async def _poll_chat_messages(
+    websocket: WebSocket,
+    ride_id: str,
+    passenger_id: str,
+    delivered_ids: set[str],
+):
+    # Database-backed polling keeps chat delivery working across multiple app instances.
+    while True:
+        chat_id = _get_chat_id(ride_id, passenger_id)
+        if chat_id:
+            for message in _get_messages_with_names(chat_id):
+                if message["id"] in delivered_ids:
+                    continue
+                await websocket.send_text(json.dumps(message))
+                delivered_ids.add(message["id"])
+        await asyncio.sleep(1)
 
 
 @router.websocket("/ws/rides/{ride_id}")
@@ -219,9 +274,13 @@ async def chat_websocket(
         await websocket.close(code=4003, reason=exc.detail)
         return
 
-    connection_key = f"{ride_id}:{passenger_id}"
     await websocket.accept()
-    _connections[connection_key].append((profile_id, websocket))
+    existing_chat_id = _get_chat_id(ride_id, passenger_id)
+    delivered_ids = set()
+    if existing_chat_id:
+        delivered_ids = {message["id"] for message in _get_messages_with_names(existing_chat_id)}
+
+    poll_task = asyncio.create_task(_poll_chat_messages(websocket, ride_id, passenger_id, delivered_ids))
 
     try:
         while True:
@@ -241,43 +300,29 @@ async def chat_websocket(
 
             msg_data = new_msg.data[0]
             sender_name = _get_sender_name(profile_id)
-
-            broadcast = json.dumps({
-                "id": msg_data["id"],
-                "chat_id": chat_id,
-                "sender_id": profile_id,
-                "sender_name": sender_name,
-                "message": message_text,
-                "created_at": msg_data["created_at"],
-                "read": False,
-            })
-
-            # Broadcast to the driver/passenger pair for this ride chat
-            for pid, ws in _connections[connection_key]:
-                try:
-                    await ws.send_text(broadcast)
-                except Exception:
-                    pass
+            message = _serialize_chat_message(msg_data, sender_name)
+            delivered_ids.add(message["id"])
+            await websocket.send_text(json.dumps(message))
 
             # Create notifications for offline participants
             all_participants = {driver_id, passenger_id}
             all_participants.discard(profile_id)
-            connected_ids = {pid for pid, _ in _connections[connection_key]}
 
             for pid in all_participants:
-                if pid not in connected_ids:
-                    _create_notification(
-                        user_id=pid,
-                        title=f"New message from {sender_name}",
-                        body=message_text[:100],
-                        link=_build_chat_link(ride_id, passenger_id, for_driver=pid == driver_id),
-                    )
+                _create_notification(
+                    user_id=pid,
+                    title=f"New message from {sender_name}",
+                    body=message_text[:100],
+                    link=_build_chat_link(ride_id, passenger_id, for_driver=pid == driver_id),
+                )
 
     except WebSocketDisconnect:
         pass
     except Exception:
         pass
     finally:
-        _connections[connection_key] = [(pid, ws) for pid, ws in _connections[connection_key] if ws != websocket]
-        if not _connections[connection_key]:
-            del _connections[connection_key]
+        poll_task.cancel()
+        try:
+            await poll_task
+        except asyncio.CancelledError:
+            pass

@@ -18,7 +18,7 @@ Endpoints tested:
 import pytest
 from unittest.mock import MagicMock, patch
 from main import app
-from app.accounts.dependencies import get_current_user
+from app.accounts.dependencies import get_current_user, require_admin_user
 from datetime import date
 from pydantic import ValidationError
 from postgrest.exceptions import APIError
@@ -37,6 +37,7 @@ FAKE_PROFILE_ID = "profile-abc"
 @pytest.fixture(autouse=True)
 def override_auth():
     app.dependency_overrides[get_current_user] = lambda: FAKE_USER
+    app.dependency_overrides[require_admin_user] = lambda: FAKE_USER
     yield
     app.dependency_overrides.clear()
 

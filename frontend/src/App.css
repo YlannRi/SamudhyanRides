@@ -729,6 +729,20 @@ body {
 
 /* Safety check-up */
 
+.safety-page {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding-top: 8px;
+}
+
+.safety-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 14px;
+}
+
 .safety-row {
   display: flex;
   align-items: center;
@@ -862,10 +876,29 @@ body {
 .trusted-contact-row {
   display: flex;
   align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
   padding: 12px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
+  flex-wrap: wrap;
+}
+
+.trusted-contact-main {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.trusted-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.trusted-contact-actions .sheet-action-btn {
+  width: auto;
+  min-width: 118px;
 }
 
 .primary-pill {
@@ -962,6 +995,21 @@ body {
 .safety-row-text {
   flex: 1;                 
   min-width: 0;
+}
+
+@media (max-width: 420px) {
+  .toggle-row {
+    align-items: flex-start;
+  }
+
+  .trusted-contact-actions {
+    width: 100%;
+  }
+
+  .trusted-contact-actions .sheet-action-btn {
+    flex: 1 1 100%;
+    width: 100%;
+  }
 }
 /* Home page layout (matches screenshot style) */
 .home-body {

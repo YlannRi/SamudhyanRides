@@ -1,5 +1,13 @@
 import React, { type CSSProperties, useEffect, useState } from 'react';
 import { apiFetch } from './lib/api';
+import {
+  type TrustedContact,
+  getPrimaryTrustedContact,
+  getProfileRecord,
+  loadTrustedContactsFromStorage,
+  normalizeTrustedContacts,
+  saveTrustedContactsToStorage,
+} from './lib/profilePreferences';
 
 type QuickActionCardProps = {
   emoji: string;
@@ -66,35 +74,20 @@ type AccountPageProps = {
   unreadCount?: number;
 };
 
+type AccountProfile = {
+  first_name?: string;
+  last_name?: string;
+  university_username?: string;
+  rider_rating?: number | null;
+  trusted_contacts?: unknown;
+};
+
 const AccountPage: React.FC<AccountPageProps> = ({ onLogout, onOpenSettings, onOpenTimetable, onOpenSafetyCheckup, onOpenInbox, unreadCount = 0 }) => {  
   const [userName, setUserName] = useState<string>('Loading...');
   const [rating, setRating] = useState<number | string>('...');
+  const [trustedContacts, setTrustedContacts] = useState<TrustedContact[]>(() => loadTrustedContactsFromStorage());
 
   const [showSafetyToolkit, setShowSafetyToolkit] = useState(false);
-
-  type TrustedContact = {
-    id: string;
-    firstName: string;
-    lastName: string;
-    phone: string;
-    address?: string;
-    email?: string;
-    isPrimary?: boolean;
-  };
-
-  const getPrimaryTrustedContact = (): TrustedContact | null => {
-    try {
-      const raw = localStorage.getItem('trustedContacts');
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return null;
-
-      const primary = parsed.find((c: TrustedContact) => c?.isPrimary);
-      return (primary || parsed[0]) ?? null;
-    } catch {
-      return null;
-    }
-  };
 
   const callNumber = (phone: string) => {
     // Works on mobile; on desktop it may just do nothing (expected)
@@ -112,11 +105,20 @@ const AccountPage: React.FC<AccountPageProps> = ({ onLogout, onOpenSettings, onO
           // no need to manually add Authorization if apiFetch already does it
         });
 
-        if (data && data.length > 0) {
-          const profile = data[0];
+        const profile = getProfileRecord(data) as AccountProfile | null;
+
+        if (profile) {
+          const storedContacts = loadTrustedContactsFromStorage();
+          const profileContacts = normalizeTrustedContacts(profile.trusted_contacts);
+          const nextContacts = profileContacts.length > 0 ? profileContacts : storedContacts;
+
+          setTrustedContacts(nextContacts);
+          if (profileContacts.length > 0) {
+            saveTrustedContactsToStorage(nextContacts);
+          }
 
           const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
-          setUserName(fullName || profile.university_username || 'University Student');
+          setUserName(fullName || String(profile.university_username || 'University Student'));
 
           const rawRating = Number(profile.rider_rating);
 
@@ -194,7 +196,7 @@ const AccountPage: React.FC<AccountPageProps> = ({ onLogout, onOpenSettings, onO
         onClick={onOpenSafetyCheckup}
       />
     {showSafetyToolkit && (() => {
-  const primary = getPrimaryTrustedContact();
+  const primary = getPrimaryTrustedContact(trustedContacts);
 
   return (
     <div className="modal-backdrop" onClick={() => setShowSafetyToolkit(false)}>

@@ -41,6 +41,21 @@ class UserProfileUpdate(BaseModel):
     status: UserStatus | None = None
 
 
+class TrustedContact(BaseModel):
+    id: str
+    firstName: NameStr # type: ignore
+    lastName: NameStr # type: ignore
+    phone: str
+    address: str | None = None
+    email: EmailStr | None = None
+    isPrimary: bool = False
+
+
+class UserPreferencesUpdate(BaseModel):
+    calendar_link: str | None = None
+    trusted_contacts: list[TrustedContact] | None = None
+
+
 class UserProfileOut(BaseModel):
     id: UUID
     first_name: str
@@ -51,3 +66,5 @@ class UserProfileOut(BaseModel):
     university_username: str
     status: UserStatus
     rating: condecimal(ge=0, le=5, max_digits=2, decimal_places=1) # type: ignore
+    calendar_link: str | None = None
+    trusted_contacts: list[TrustedContact] | None = None

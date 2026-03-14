@@ -1,7 +1,7 @@
 from datetime import datetime, date
 from fastapi import APIRouter, Depends, HTTPException
 from app.accounts.database import supabase
-from app.accounts.dependencies import get_current_user
+from app.accounts.dependencies import get_current_user, require_admin_user
 import re
 from pydantic import BaseModel
 from postgrest.exceptions import APIError
@@ -302,7 +302,7 @@ def get_all_drivers(current_user: dict = Depends(get_current_user)):
     return profiles.data
 
 @router.get("/verification-requests")
-def get_verification_requests(current_user: dict = Depends(get_current_user)):
+def get_verification_requests(current_user: dict = Depends(require_admin_user)):
     response = supabase.table("driver_verification").select("*").eq("verified", False).execute()
     if not response.data:
         raise HTTPException(status_code=404, detail="No Verification Requests")
@@ -323,7 +323,7 @@ def get_driver(driver_id: str, current_user: dict = Depends(get_current_user)):
     return profile.data[0]
 
 @router.post("/verify/{driver_verification_id}")
-def verify_driver(driver_verification_id: str, current_user: dict = Depends(get_current_user)):
+def verify_driver(driver_verification_id: str, current_user: dict = Depends(require_admin_user)):
     existing = supabase.table("driver_verification").select("*").eq("id", driver_verification_id).execute()
     if not existing.data:
         raise HTTPException(status_code=404, detail="Verification request not found")

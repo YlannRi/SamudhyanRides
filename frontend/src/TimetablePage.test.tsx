@@ -47,6 +47,17 @@ describe('TimetablePage Component', () => {
     expect(input).toHaveValue('https://mytimetable.bath.ac.uk/ical?test');
   });
 
+  it('loads the saved calendar link from the account profile when available', async () => {
+    window.localStorage.setItem('authToken', 'fake-token');
+    vi.mocked(apiFetch).mockResolvedValueOnce([{ calendar_link: 'https://bath.ac.uk/account-feed.ics' }]);
+
+    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('University timetable iCal URL')).toHaveValue('https://bath.ac.uk/account-feed.ics');
+    });
+  });
+
   it('shows an error if trying to load without a URL', async () => {
     render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
 

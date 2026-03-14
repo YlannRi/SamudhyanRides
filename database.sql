@@ -29,6 +29,9 @@ create table public.user_profiles (
 
   university_username text not null,
 
+  calendar_link text,
+  trusted_contacts jsonb not null default '[]'::jsonb,
+
   status user_status not null default 'student',
 
   -- Average rating, not per-rating history
