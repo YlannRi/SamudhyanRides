@@ -3,6 +3,7 @@ import './JourneyPage.css';
 import { DetailRow, Icons } from './App';
 import { Btn } from './App.tsx';
 import { RideRenderMap } from './components/Map/RideRenderMap';
+import { apiFetch } from './lib/api';
 
 
 // User Journey View
@@ -312,56 +313,32 @@ const JourneyPage: React.FC<{
   const fetchActiveJourneys = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('authToken');
-      if (!token) throw new Error("No token found");
-
       // Fetch User Bookings
-      const userRes = await fetch('https://localhost:8000/bookings/me', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        const activeBookings = userData.filter((b: any) => b.status === 'confirmed' && b.ride?.status === 'in_progress');
+      const userTrips = await apiFetch<any[]>('bookings/me', { method: 'GET' });
+      const activeBookings = userTrips.filter((b: any) => b.status === 'confirmed' && b.ride?.status === 'in_progress');
 
-        const enriched = await Promise.all(
-          activeBookings.map(async (b: any) => {
+      const enriched = await Promise.all(
+        activeBookings.map(async (b: any) => {
+          try {
+            const vehicle = await apiFetch<any>(`bookings/rides/${b.ride_id}/vehicle`, { method: 'GET' });
+            return { ...b, vehicle };
+          } catch (e) {
+            console.error("Vehicle fetch failed for ride", b.ride_id, e);
+          }
 
-            try {
-              const vRes = await fetch(
-                `https://localhost:8000/bookings/rides/${b.ride_id}/vehicle`,  // <-- use ride_id
-                {
-                  headers: { Authorization: `Bearer ${token}` },
-                }
-              );
+          // fallback: booking without vehicle
+          return b;
+        })
+      );
 
-
-              if (vRes.ok) {
-                const vehicle = await vRes.json();
-                return { ...b, vehicle };
-              }
-            } catch (e) {
-              console.error("Vehicle fetch failed for ride", b.ride_id, e);
-            }
-
-            // fallback: booking without vehicle
-            return b;
-          })
-        );
-
-        setActiveUserTrips(enriched);
-      }
+      setActiveUserTrips(enriched);
 
 
 
       // Fetch Driver Dashboard
-      const driverRes = await fetch('https://localhost:8000/rides/driver/dashboard', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (driverRes.ok) {
-        const driverData = await driverRes.json();
-        const activeRides = driverData.filter((r: any) => r.status === 'in_progress');
-        setActiveDriverRides(activeRides);
-      }
+      const driverData = await apiFetch<any>('rides/driver/dashboard', { method: 'GET' });
+      const activeRides = driverData.filter((r: any) => r.status === 'in_progress');
+      setActiveDriverRides(activeRides);
 
     } catch (err) {
       console.error("Error fetching journeys:", err);
@@ -379,20 +356,7 @@ const JourneyPage: React.FC<{
   // Handler for completing the ride
   const handleCompleteRide = async (rideId: number) => {
     try {
-      const token = localStorage.getItem('authToken');
-      if (!token) return;
-
-      const response = await fetch(`https://localhost:8000/bookings/rides/${rideId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to complete ride');
-      }
+      await apiFetch(`bookings/rides/${rideId}/complete`, { method: 'POST' });
 
       // Remove the completed ride from state directly so the UI updates instantly
       setActiveDriverRides(prev => prev.filter(r => r.id !== rideId));

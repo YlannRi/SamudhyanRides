@@ -361,7 +361,8 @@ const App: React.FC = () => {
   const handleRideStarted = () => {
     setJourneyMode('driver');
     setActivityMode('Driver');
-    navigate('journey');
+    window.history.pushState({}, '', '/journey?mode=driver');
+    setActiveTab('journey');
   };
 
   const renderAuthedContent = () => {

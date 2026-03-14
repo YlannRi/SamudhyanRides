@@ -1,19 +1,88 @@
 // src/api.ts
 
 const RAW_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const PROD_API_BASE_URL = 'https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io';
+const DEV_API_BASE_URL = 'https://localhost:8000';
 
-// Default to empty string so calls like apiFetch("/account/...") work even without env set.
-// If you use a Vite proxy or nginx reverse-proxy, set VITE_API_BASE_URL="/api" and call apiFetch("/auth/login") etc.
-const API_BASE_URL = (RAW_BASE ?? "").replace(/\/+$/, "");
+type LocationLike = Pick<Location, 'hostname' | 'origin' | 'protocol'>;
+
+function getCurrentLocation(): LocationLike | null {
+  return typeof window === 'undefined' ? null : window.location;
+}
+
+function trimTrailingSlashes(value: string) {
+  return value.replace(/\/+$/, '');
+}
+
+function isLocalHost(hostname: string) {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+}
+
+function normalizeAbsoluteBaseUrl(rawBase: string, currentLocation: LocationLike | null) {
+  const parsed = new URL(rawBase);
+
+  if (currentLocation?.protocol === 'https:' && parsed.protocol === 'http:') {
+    parsed.protocol = 'https:';
+  }
+
+  return trimTrailingSlashes(parsed.toString());
+}
+
+export function resolveApiBaseUrl(
+  rawBase = RAW_BASE,
+  currentLocation: LocationLike | null = getCurrentLocation(),
+) {
+  const base = trimTrailingSlashes((rawBase ?? '').trim());
+  const appIsLocal = currentLocation ? isLocalHost(currentLocation.hostname) : false;
+
+  if (base.startsWith('/')) {
+    return base;
+  }
+
+  if (base) {
+    try {
+      const normalized = normalizeAbsoluteBaseUrl(base, currentLocation);
+      const apiHost = new URL(normalized).hostname;
+
+      if (!appIsLocal && isLocalHost(apiHost)) {
+        return PROD_API_BASE_URL;
+      }
+
+      return normalized;
+    } catch {
+      return base;
+    }
+  }
+
+  if (appIsLocal) {
+    return DEV_API_BASE_URL;
+  }
+
+  return currentLocation ? PROD_API_BASE_URL : '';
+}
 
 /**
  * Join base + path safely.
- * - If API_BASE_URL="" and path="/account/..." => "/account/..."
- * - If API_BASE_URL="/api" and path="/auth/login" => "/api/auth/login"
+ * - If base="" and path="/account/..." => "/account/..."
+ * - If base="/api" and path="/auth/login" => "/api/auth/login"
  */
-function buildUrl(path: string) {
-  const p = path.startsWith("/") ? path : `/${path}`;
-  return `${API_BASE_URL}${p}`;
+export function buildApiUrl(path: string, rawBase = RAW_BASE, currentLocation: LocationLike | null = getCurrentLocation()) {
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${resolveApiBaseUrl(rawBase, currentLocation)}${p}`;
+}
+
+export function buildWebSocketUrl(
+  path: string,
+  rawBase = RAW_BASE,
+  currentLocation: LocationLike | null = getCurrentLocation(),
+) {
+  const p = path.startsWith('/') ? path : `/${path}`;
+  const apiBaseUrl = resolveApiBaseUrl(rawBase, currentLocation);
+  const absoluteBase = apiBaseUrl.startsWith('/')
+    ? trimTrailingSlashes(new URL(apiBaseUrl, currentLocation?.origin ?? 'http://localhost').toString())
+    : apiBaseUrl;
+
+  return `${absoluteBase.replace(/^http/i, 'ws')}${p}`;
 }
 
 export type ApiFetchOptions = Omit<RequestInit, "headers"> & {
@@ -22,7 +91,7 @@ export type ApiFetchOptions = Omit<RequestInit, "headers"> & {
 };
 
 export async function apiFetch<T = any>(path: string, opts: ApiFetchOptions = {}): Promise<T> {
-  const url = buildUrl(path);
+  const url = buildApiUrl(path);
 
   const headers: Record<string, string> = {
     ...(opts.headers ?? {}),

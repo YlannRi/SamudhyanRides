@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { apiFetch } from './lib/api';
+import { apiFetch, buildWebSocketUrl } from './lib/api';
 import { getAuthToken } from './lib/authToken';
 import { Icons } from './App';
 
@@ -70,11 +70,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ rideId, participantId, onBack }) =>
     const token = getAuthToken();
     if (!token) return;
 
-    const rawBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
-    const httpBase = (rawBase ?? '').replace(/\/+$/, '');
-    const wsBase = httpBase.replace(/^http/, 'ws');
     const participantQuery = participantId ? `&participant_id=${encodeURIComponent(participantId)}` : '';
-    const wsUrl = `${wsBase}/rides/ws/rides/${rideId}?token=${encodeURIComponent(token)}${participantQuery}`;
+    const wsUrl = buildWebSocketUrl(
+      `/rides/ws/rides/${rideId}?token=${encodeURIComponent(token)}${participantQuery}`,
+    );
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

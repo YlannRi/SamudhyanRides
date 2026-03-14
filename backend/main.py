@@ -1,15 +1,17 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import routing, users, drivers, rides, bookings, payments, ratings, incidents, auth, timetable, chat, notification
 import uvicorn
 
-app = FastAPI(title="Samudhyan Rides - Backend", version  = "1.0.1")
+app = FastAPI(title="Samudhyan Rides - Backend", version="1.0.1")
 
 origins = [
     "https://app.samudhyanrides.com",
-    "https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io",
+    "https://samudhyanrides.vercel.app",
     "http://localhost:3000",
     "http://localhost:5173",
+    "https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io"
 ]
 
 app.add_middleware(

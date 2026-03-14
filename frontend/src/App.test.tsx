@@ -47,9 +47,10 @@ vi.mock('./JourneyPage', () => ({
 }));
 
 vi.mock('./ActivityPage', () => ({
-  default: ({ onDriverSignup }: any) => (
+  default: ({ onDriverSignup, onRideStarted }: any) => (
     <div data-testid="activity-page">
       <button onClick={onDriverSignup}>Activity Driver Signup</button>
+      <button onClick={onRideStarted}>Mock Ride Started</button>
     </div>
   )
 }));
@@ -188,6 +189,15 @@ describe('App Component', () => {
 
       fireEvent.click(screen.getByText('Account'));
       expect(screen.getByTestId('account-page')).toBeInTheDocument();
+    });
+
+    it('navigates to the driver journey route when a ride starts', () => {
+      fireEvent.click(screen.getByText('Activity'));
+      fireEvent.click(screen.getByText('Mock Ride Started'));
+
+      expect(screen.getByTestId('journey-page')).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/journey');
+      expect(window.location.search).toBe('?mode=driver');
     });
 
     it('handles Home page callbacks (Request Ride, Timetable)', () => {
