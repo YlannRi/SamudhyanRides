@@ -6,9 +6,10 @@ import uvicorn
 app = FastAPI(title="Samudhyan Rides - Backend", version  = "1.0.1")
 
 origins = [
+    "https://app.samudhyanrides.com",
+    "https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io",
     "http://localhost:3000",
     "http://localhost:5173",
-    "*",
 ]
 
 app.add_middleware(
