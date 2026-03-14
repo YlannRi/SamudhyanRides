@@ -1,27 +1,16 @@
 """
-test_auth.py — Tests for /auth/register, /auth/login, /auth/logout
-
-Test strategy:
-  - Validation tests (no mocking needed — Supabase is never reached)
-  - Success/failure paths for register and login (mock Supabase calls)
-  - Logout (mock auth dependency + supabase.auth.sign_out)
+Tests for /auth/register, /auth/login, and /auth/logout.
 """
 
 from unittest.mock import MagicMock, patch
 
 
-# ---------------------------------------------------------------------------
-# POST /auth/register — validation tests (no mocking needed)
-# ---------------------------------------------------------------------------
-
 class TestRegisterValidation:
-    """All these checks fire before Supabase is ever called."""
-
     def test_rejects_non_bath_email(self, client):
         response = client.post("/auth/register", json={
             "email": "user@gmail.com",
             "password": "Password1!",
-            "full_name": "Test User"
+            "full_name": "Test User",
         })
         assert response.status_code == 400
         assert "University of Bath" in response.json()["detail"]
@@ -29,8 +18,8 @@ class TestRegisterValidation:
     def test_rejects_password_too_short(self, client):
         response = client.post("/auth/register", json={
             "email": "user@bath.ac.uk",
-            "password": "Ab1!",          # only 4 chars
-            "full_name": "Test User"
+            "password": "Ab1!",
+            "full_name": "Test User",
         })
         assert response.status_code == 400
         assert "8 characters" in response.json()["detail"]
@@ -39,7 +28,7 @@ class TestRegisterValidation:
         response = client.post("/auth/register", json={
             "email": "user@bath.ac.uk",
             "password": "PASSWORD1!",
-            "full_name": "Test User"
+            "full_name": "Test User",
         })
         assert response.status_code == 400
         assert "lowercase" in response.json()["detail"]
@@ -48,7 +37,7 @@ class TestRegisterValidation:
         response = client.post("/auth/register", json={
             "email": "user@bath.ac.uk",
             "password": "password1!",
-            "full_name": "Test User"
+            "full_name": "Test User",
         })
         assert response.status_code == 400
         assert "uppercase" in response.json()["detail"]
@@ -57,7 +46,7 @@ class TestRegisterValidation:
         response = client.post("/auth/register", json={
             "email": "user@bath.ac.uk",
             "password": "Password!",
-            "full_name": "Test User"
+            "full_name": "Test User",
         })
         assert response.status_code == 400
         assert "number" in response.json()["detail"]
@@ -66,7 +55,7 @@ class TestRegisterValidation:
         response = client.post("/auth/register", json={
             "email": "user@bath.ac.uk",
             "password": "Pass word1!",
-            "full_name": "Test User"
+            "full_name": "Test User",
         })
         assert response.status_code == 400
         assert "spaces" in response.json()["detail"]
@@ -74,21 +63,15 @@ class TestRegisterValidation:
     def test_rejects_password_no_special_char(self, client):
         response = client.post("/auth/register", json={
             "email": "user@bath.ac.uk",
-            "password": "Password1",    # no special char
-            "full_name": "Test User"
+            "password": "Password1",
+            "full_name": "Test User",
         })
         assert response.status_code == 400
         assert "special character" in response.json()["detail"]
 
 
-# ---------------------------------------------------------------------------
-# POST /auth/register — success path (mocking Supabase)
-# ---------------------------------------------------------------------------
-
 class TestRegisterSuccess:
-
     def test_successful_registration(self, client):
-        """Mock supabase so no real network call is made."""
         mock_user = MagicMock()
         mock_user.id = "abc-123"
         mock_user.email = "newuser@bath.ac.uk"
@@ -96,15 +79,16 @@ class TestRegisterSuccess:
         mock_response = MagicMock()
         mock_response.user = mock_user
 
-        # Patch at the module where supabase is used
-        with patch("app.routers.auth.supabase") as mock_supabase:
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
             mock_supabase.auth.sign_up.return_value = mock_response
             mock_supabase.table.return_value.insert.return_value.execute.return_value = MagicMock()
 
             response = client.post("/auth/register", json={
                 "email": "newuser@bath.ac.uk",
                 "password": "Password1!",
-                "full_name": "New User"
+                "full_name": "New User",
             })
 
         assert response.status_code == 200
@@ -113,48 +97,46 @@ class TestRegisterSuccess:
         assert data["user_id"] == "abc-123"
 
     def test_register_splits_full_name_correctly(self, client):
-        """First/last name should be split on the first space."""
         mock_user = MagicMock()
         mock_user.id = "def-456"
         mock_user.email = "john.doe@bath.ac.uk"
+
         mock_response = MagicMock()
         mock_response.user = mock_user
 
-        with patch("app.routers.auth.supabase") as mock_supabase:
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
             mock_supabase.auth.sign_up.return_value = mock_response
             mock_supabase.table.return_value.insert.return_value.execute.return_value = MagicMock()
 
             response = client.post("/auth/register", json={
                 "email": "john.doe@bath.ac.uk",
                 "password": "Password1!",
-                "full_name": "John Doe"
+                "full_name": "John Doe",
             })
 
         assert response.status_code == 200
 
     def test_register_supabase_returns_no_user(self, client):
-        """If Supabase returns user=None, should get a 400."""
         mock_response = MagicMock()
         mock_response.user = None
 
-        with patch("app.routers.auth.supabase") as mock_supabase:
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
             mock_supabase.auth.sign_up.return_value = mock_response
 
             response = client.post("/auth/register", json={
                 "email": "user@bath.ac.uk",
                 "password": "Password1!",
-                "full_name": "Test User"
+                "full_name": "Test User",
             })
 
         assert response.status_code == 400
 
 
-# ---------------------------------------------------------------------------
-# POST /auth/login
-# ---------------------------------------------------------------------------
-
 class TestLogin:
-
     def test_successful_login_with_email(self, client):
         mock_user = MagicMock()
         mock_session = MagicMock()
@@ -165,14 +147,15 @@ class TestLogin:
         mock_response.user = mock_user
         mock_response.session = mock_session
 
-        with patch("app.routers.auth.supabase") as mock_sb:
-            # Username lookup returns nothing → treat identifier as email directly
-            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
-            mock_sb.auth.sign_in_with_password.return_value = mock_response
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
+            mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+            mock_supabase.auth.sign_in_with_password.return_value = mock_response
 
             response = client.post("/auth/login", json={
                 "identifier": "user@bath.ac.uk",
-                "password": "Password1!"
+                "password": "Password1!",
             })
 
         assert response.status_code == 200
@@ -182,7 +165,6 @@ class TestLogin:
         assert data["token_type"] == "bearer"
 
     def test_successful_login_with_university_username(self, client):
-        """If identifier matches a university username, it's resolved to the email."""
         mock_user = MagicMock()
         mock_session = MagicMock()
         mock_session.access_token = "fake-access-token"
@@ -192,56 +174,51 @@ class TestLogin:
         mock_response.user = mock_user
         mock_response.session = mock_session
 
-        with patch("app.routers.auth.supabase") as mock_sb:
-            # Username lookup finds a matching email
-            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
-                {"email": "jd123@bath.ac.uk"}
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
+            mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+                {"email": "jd123@bath.ac.uk"},
             ]
-            mock_sb.auth.sign_in_with_password.return_value = mock_response
+            mock_supabase.auth.sign_in_with_password.return_value = mock_response
 
             response = client.post("/auth/login", json={
                 "identifier": "jd123",
-                "password": "Password1!"
+                "password": "Password1!",
             })
 
         assert response.status_code == 200
 
     def test_login_invalid_credentials(self, client):
-        with patch("app.routers.auth.supabase") as mock_sb:
-            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
-            mock_sb.auth.sign_in_with_password.side_effect = Exception("Invalid login credentials")
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
+            mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+            mock_supabase.auth.sign_in_with_password.side_effect = Exception("Invalid login credentials")
 
             response = client.post("/auth/login", json={
                 "identifier": "user@bath.ac.uk",
-                "password": "wrongpassword"
+                "password": "wrongpassword",
             })
 
         assert response.status_code == 401
 
 
-# ---------------------------------------------------------------------------
-# POST /auth/logout
-# ---------------------------------------------------------------------------
-
 class TestLogout:
-
     def test_successful_logout(self, client):
-        """
-        FastAPI resolves dependencies through its own DI system, so
-        unittest.mock.patch won't intercept get_current_user. Instead we use
-        app.dependency_overrides to swap it out for a simple lambda.
-        """
-        from main import app
         from app.accounts.dependencies import get_current_user
+        from main import app
 
         fake_user = {"sub": "abc-123", "email": "user@bath.ac.uk"}
         app.dependency_overrides[get_current_user] = lambda: fake_user
 
-        with patch("app.routers.auth.supabase") as mock_supabase:
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
             mock_supabase.auth.sign_out.return_value = None
             response = client.post("/auth/logout")
 
-        app.dependency_overrides.clear()  # always clean up after the test
+        app.dependency_overrides.clear()
 
         assert response.status_code == 200
         assert response.json()["message"] == "Successfully logged out"

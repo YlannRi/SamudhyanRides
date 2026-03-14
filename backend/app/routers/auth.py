@@ -1,4 +1,4 @@
-from app.accounts.database import supabase
+from app.accounts.database import create_supabase_client
 from app.accounts.dependencies import get_current_user
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
@@ -18,6 +18,8 @@ class RegisterRequest(BaseModel):
 # auth.py (inside the register function)
 @router.post("/register")
 def register(request: RegisterRequest):
+    auth_client = create_supabase_client()
+
     # Restrict to University of Bath emails
     if not request.email.endswith("@bath.ac.uk"):
         raise HTTPException(status_code=400, detail="Only University of Bath emails are allowed.")
@@ -38,7 +40,7 @@ def register(request: RegisterRequest):
 
     try:
         # Create user in Supabase Auth
-        response = supabase.auth.sign_up({
+        response = auth_client.auth.sign_up({
             "email": request.email,
             "password": request.password,
         })
@@ -53,7 +55,7 @@ def register(request: RegisterRequest):
         uni_username = request.email.split("@")[0].lower()
 
         # Create user profile row with the new data
-        supabase.table("user_profiles").insert({
+        auth_client.table("user_profiles").insert({
             "auth_user_id": response.user.id,
             "email": response.user.email,
             "first_name": first_name,
@@ -71,10 +73,12 @@ def register(request: RegisterRequest):
 
 @router.post("/login")
 def login(request: LoginRequest):
+    auth_client = create_supabase_client()
+
     try:
         identifier = request.identifier
 
-        user_lookup = supabase.table("user_profiles") \
+        user_lookup = auth_client.table("user_profiles") \
                 .select("email") \
                 .eq("university_username", identifier) \
                 .execute()
@@ -82,7 +86,7 @@ def login(request: LoginRequest):
         if user_lookup.data:
             identifier = user_lookup.data[0]["email"]
 
-        response = supabase.auth.sign_in_with_password({
+        response = auth_client.auth.sign_in_with_password({
             "email": identifier,
             "password": request.password
         })
@@ -102,7 +106,7 @@ def login(request: LoginRequest):
 @router.post("/logout")
 def logout(current_user: dict = Depends(get_current_user)):
     try:
-        supabase.auth.sign_out()
+        create_supabase_client().auth.sign_out()
         return {"message": "Successfully logged out"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

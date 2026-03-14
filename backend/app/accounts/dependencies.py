@@ -2,7 +2,7 @@ import os
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.accounts.database import supabase
+from app.accounts.database import create_supabase_client
 
 security = HTTPBearer()  # This checks the Authorization header automatically
 
@@ -13,7 +13,7 @@ def get_current_user(
     token = credentials.credentials
 
     try:
-        user = supabase.auth.get_user(token)
+        user = create_supabase_client().auth.get_user(token)
         if not user.user:
             raise HTTPException(status_code=401, detail="User not found")
         return {

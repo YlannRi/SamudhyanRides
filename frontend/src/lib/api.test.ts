@@ -15,6 +15,7 @@ const localLocation = {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  localStorage.clear();
 });
 
 it('forces https for absolute API urls on secure pages', () => {
@@ -47,4 +48,18 @@ it('throws an error if the response is not OK', async () => {
   } as Response);
 
   await expect(apiFetch('bad-endpoint')).rejects.toThrow();
+});
+
+it('clears the stored auth token when an API call returns 401', async () => {
+  localStorage.setItem('authToken', 'expired-token');
+
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: false,
+    status: 401,
+    statusText: 'Unauthorized',
+    json: vi.fn().mockResolvedValue({ detail: 'JWT expired' }),
+  } as unknown as Response);
+
+  await expect(apiFetch('users/me')).rejects.toThrow('JWT expired');
+  expect(localStorage.getItem('authToken')).toBeNull();
 });

@@ -1,4 +1,5 @@
 // src/api.ts
+import { clearAuthToken } from "./authToken";
 
 const RAW_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined;
 const PROD_API_BASE_URL = 'https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io';
@@ -108,6 +109,10 @@ export async function apiFetch<T = any>(path: string, opts: ApiFetchOptions = {}
   // Try to parse error body for nicer messages
     // Try to parse error body for nicer messages (and preserve structured error detail)
   if (!res.ok) {
+    if (res.status === 401) {
+      clearAuthToken();
+    }
+
     let message = `Request failed: ${res.status} ${res.statusText}`;
     let detail: any = null;
     try {
