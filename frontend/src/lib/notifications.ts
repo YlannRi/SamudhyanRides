@@ -50,7 +50,7 @@ export async function fetchUnreadCount(): Promise<number> {
 
 export async function fetchNotifications(): Promise<Notification[]> {
   try {
-    const res = await apiFetch<Notification[]>('notifications', { method: 'GET' });
+    const res = await apiFetch<Notification[]>('notifications/', { method: 'GET' });
     _notifications = res || [];
     _unreadCount = _notifications.filter((n) => !n.read).length;
     notify();
