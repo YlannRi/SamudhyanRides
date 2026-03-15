@@ -820,7 +820,9 @@ const ActivityPage: React.FC<ActivityPageProps> = ({ canUseDriverMode, onDriverS
             status: ride.status === 'completed' ? 'pastDriver' :
               ride.status === 'in_progress' ? 'activeDriver' : 'upcomingDriver',
             action: 'More',
-            numberPassengers: ride.seats_total - ride.seats_available,
+            numberPassengers: ride.bookings.filter(
+              (b: any) => b.status === 'confirmed' || b.status === 'completed'
+            ).length,
             passengers: ride.bookings
               .filter((b: any) => b.status === 'confirmed' || b.status === 'completed')
               .map((b: any) => ({
