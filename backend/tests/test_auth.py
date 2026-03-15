@@ -3,6 +3,7 @@ Tests for /auth/register, /auth/login, and /auth/logout.
 """
 
 from unittest.mock import MagicMock, patch
+from postgrest.exceptions import APIError
 
 
 class TestRegisterValidation:
@@ -150,7 +151,6 @@ class TestLogin:
         with patch("app.routers.auth.create_supabase_client") as mock_create_client:
             mock_supabase = MagicMock()
             mock_create_client.return_value = mock_supabase
-            mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
             mock_supabase.auth.sign_in_with_password.return_value = mock_response
 
             response = client.post("/auth/login", json={
@@ -163,6 +163,7 @@ class TestLogin:
         assert data["access_token"] == "fake-access-token"
         assert data["refresh_token"] == "fake-refresh-token"
         assert data["token_type"] == "bearer"
+        mock_supabase.table.assert_not_called()
 
     def test_successful_login_with_university_username(self, client):
         mock_user = MagicMock()
@@ -202,6 +203,23 @@ class TestLogin:
             })
 
         assert response.status_code == 401
+
+    def test_login_returns_service_unavailable_when_username_lookup_uses_expired_supabase_jwt(self, client):
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
+            mock_supabase.table.return_value.select.return_value.eq.return_value.execute.side_effect = APIError({
+                "message": "JWT expired",
+                "code": "PGRST303",
+            })
+
+            response = client.post("/auth/login", json={
+                "identifier": "jd123",
+                "password": "Password1!",
+            })
+
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Authentication service unavailable"
 
 
 class TestLogout:
