@@ -16,6 +16,7 @@ import TimetablePage, { type RidePrefill } from './TimetablePage';
 import SafetyCheckupPage from './SafetyCheckupPage.tsx';
 import { getAuthToken, clearAuthToken } from './lib/authToken';
 import { getUnreadCount, subscribe, startPolling, stopPolling } from './lib/notifications';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 type Tab = 'home' | 'journey' | 'activity' | 'account' | 'settings' | 'request' | 'post' | 'timetable' | 'safety' | 'chat' | 'inbox';
 
@@ -574,6 +575,8 @@ const App: React.FC = () => {
           </button>
         </nav>
       )}
+
+      <SpeedInsights />
     </div>
   );
 };
