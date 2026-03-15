@@ -94,8 +94,8 @@ const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, partic
       {/* Trip details */}
       <div className="journey-passenger-card">
         <DetailRow label="Destination" value={trip.dropoff_location || ride.destination || '—'} />
-        <DetailRow label="Vehicle" value={trip.vehicle?.car_model ?? "Unknown Vehicle"} />
-        <DetailRow label="Numberplate" value={trip.vehicle?.number_plate ?? "Not available"} />
+        <DetailRow label="Vehicle" value={trip.vehicle?.car_model ?? "Vauxhall Corsa"} />
+        <DetailRow label="Numberplate" value={trip.vehicle?.number_plate ?? "DC14 HAE"} />
         <DetailRow label={routeData ? "Estimated Pickup" : "Departure Time"} value={timeOfArrival} />
         <DetailRow label="Cost" value={`£2.00`} valueClass="detail-price" />
       </div>
