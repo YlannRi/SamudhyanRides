@@ -1,6 +1,7 @@
 from app.accounts.database import create_supabase_client
 from app.accounts.dependencies import get_current_user
 from fastapi import APIRouter, HTTPException, Depends
+from postgrest.exceptions import APIError
 from pydantic import BaseModel
 import re
 
@@ -17,6 +18,10 @@ class RegisterRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+def _looks_like_email(identifier: str) -> bool:
+    return "@" in identifier
 
 # auth.py (inside the register function)
 @router.post("/register")
@@ -79,15 +84,24 @@ def login(request: LoginRequest):
     auth_client = create_supabase_client()
 
     try:
-        identifier = request.identifier
+        identifier = request.identifier.strip()
 
-        user_lookup = auth_client.table("user_profiles") \
-                .select("email") \
-                .eq("university_username", identifier) \
-                .execute()
+        if not _looks_like_email(identifier):
+            try:
+                user_lookup = auth_client.table("user_profiles") \
+                        .select("email") \
+                        .eq("university_username", identifier.lower()) \
+                        .execute()
+            except APIError as exc:
+                if getattr(exc, "code", None) == "PGRST303":
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Authentication service unavailable"
+                    ) from exc
+                raise
 
-        if user_lookup.data:
-            identifier = user_lookup.data[0]["email"]
+            if user_lookup.data:
+                identifier = user_lookup.data[0]["email"]
 
         response = auth_client.auth.sign_in_with_password({
             "email": identifier,
@@ -103,6 +117,8 @@ def login(request: LoginRequest):
             "token_type": "bearer" # this is the JWT token
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
 
