@@ -143,22 +143,27 @@ class TestAcceptBooking:
         with patch("app.routers.bookings.supabase") as mock_sb, \
              patch("app.routers.bookings.generate_pickup_code", return_value="1234"), \
              patch("app.routers.bookings.notify_passenger_of_booking_acceptance") as mock_notify:
+            def fake_table(name):
+                tm = MagicMock()
+                if name == "user_profiles":
+                    tm.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+                elif name == "bookings":
+                    tm.select.return_value.eq.return_value.execute.return_value.data = [
+                        {**fake_booking, "passenger_id": "passenger-9"}
+                    ]
+                    tm.update.return_value.eq.return_value.execute.return_value.data = [
+                        {**fake_booking, "status": "confirmed", "pickup_code": "1234"}
+                    ]
+                elif name == "rides":
+                    tm.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [
+                        {**fake_ride, "destination": "Bristol"}
+                    ]
+                    tm.update.return_value.eq.return_value.execute.return_value.data = [
+                        {"id": "ride-1", "seats_available": 1, "status": "open"}
+                    ]
+                return tm
 
-            # 1. get_profile_id
-            # 2. get booking
-            mock_sb.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
-                MagicMock(data=[{"id": FAKE_PROFILE_ID}]),
-                MagicMock(data=[{**fake_booking, "passenger_id": "passenger-9"}]),
-            ]
-
-            # 3. get ride (requires two eq chains, so mock the first eq to return an object with another eq)
-            mock_ride_query = MagicMock()
-            mock_ride_query.eq.return_value.execute.return_value.data = [{**fake_ride, "destination": "Bristol"}]
-            # Replace the generic .eq from the second side_effect onwards
-            mock_sb.table.return_value.select.return_value.eq.return_value = mock_ride_query
-
-            # Setup update mocks for both ride and booking
-            mock_sb.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [{"status": "confirmed"}]
+            mock_sb.table.side_effect = fake_table
 
             response = client.put("/bookings/book-1/accept")
 

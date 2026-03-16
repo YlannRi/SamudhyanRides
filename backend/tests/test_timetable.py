@@ -6,11 +6,12 @@ Endpoints tested:
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-from main import app
-from app.accounts.dependencies import get_current_user
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
-from datetime import datetime, timezone
+
+from app.accounts.dependencies import get_current_user
+from main import app
 
 FAKE_USER = {"sub": "user-abc-123", "email": "passenger@bath.ac.uk"}
 
@@ -48,8 +49,7 @@ END:VCALENDAR
 
 class TestTimetableEvents:
 
-    @pytest.mark.asyncio
-    async def test_fetches_and_parses_events_successfully_week(self, client):
+    def test_fetches_and_parses_events_successfully_week(self, client):
         mock_response = MagicMock()
         mock_response.content = VALID_ICAL_DATA
         mock_response.raise_for_status = MagicMock()
@@ -74,8 +74,7 @@ class TestTimetableEvents:
         assert data[0]["title"] == "Test Lecture"
         assert data[0]["location"] == "BATH 1.2"
 
-    @pytest.mark.asyncio
-    async def test_fetches_and_parses_events_successfully_day(self, client):
+    def test_fetches_and_parses_events_successfully_day(self, client):
         mock_response = MagicMock()
         mock_response.content = VALID_ICAL_DATA
         mock_response.raise_for_status = MagicMock()
@@ -104,8 +103,7 @@ class TestTimetableEvents:
         assert response.status_code == 400
         assert "Only https://mytimetable.bath.ac.uk/ical feeds are allowed" in response.json()["detail"]
 
-    @pytest.mark.asyncio
-    async def test_handles_httpx_timeout_or_error(self, client):
+    def test_handles_httpx_timeout_or_error(self, client):
         mock_client_instance = AsyncMock()
         # Simulate a network error throwing RequestError
         mock_client_instance.get.side_effect = httpx.RequestError("Timeout")
@@ -123,8 +121,7 @@ class TestTimetableEvents:
         assert response.status_code == 502
         assert "Failed to fetch timetable feed" in response.json()["detail"]
 
-    @pytest.mark.asyncio
-    async def test_handles_invalid_ical_format(self, client):
+    def test_handles_invalid_ical_format(self, client):
         mock_response = MagicMock()
         mock_response.content = INVALID_ICAL_DATA
         mock_response.raise_for_status = MagicMock()

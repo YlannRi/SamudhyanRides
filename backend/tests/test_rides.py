@@ -319,16 +319,23 @@ class TestUpdateRide:
 
         with patch("app.routers.rides.supabase") as mock_sb, \
              patch("app.routers.rides.notify_ride_started") as mock_notify:
-            mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
-            mock_sb.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [existing_ride]
-            mock_sb.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [{**existing_ride, "status": "in_progress"}]
+            def fake_table(name):
+                tm = MagicMock()
+                if name == "user_profiles":
+                    tm.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
+                elif name == "rides":
+                    tm.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [existing_ride]
+                    tm.update.return_value.eq.return_value.execute.return_value.data = [
+                        {**existing_ride, "status": "in_progress"}
+                    ]
+                elif name == "bookings":
+                    tm.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [
+                        {"passenger_id": "passenger-1", "status": "confirmed"},
+                        {"passenger_id": "passenger-2", "status": "confirmed"},
+                    ]
+                return tm
 
-            bookings_query = MagicMock()
-            bookings_query.eq.return_value.execute.return_value.data = [
-                {"passenger_id": "passenger-1", "status": "confirmed"},
-                {"passenger_id": "passenger-2", "status": "confirmed"},
-            ]
-            mock_sb.table.return_value.select.return_value.eq.return_value.eq.return_value = bookings_query
+            mock_sb.table.side_effect = fake_table
 
             response = client.put("/rides/ride-1", json={"status": "in_progress"})
 
@@ -409,27 +416,20 @@ class TestCancelRide:
     def test_cancels_ride_successfully(self, client):
         with patch("app.routers.rides.supabase") as mock_sb, \
              patch("app.routers.rides.notify_passengers_of_ride_cancellation") as mock_notify:
-            profile_query = MagicMock()
-            profile_query.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
-
-            existing_query = MagicMock()
-            existing_query.eq.return_value.execute.return_value.data = [{"id": "ride-1", "destination": "Bristol"}]
-
-            bookings_query = MagicMock()
-            bookings_query.neq.return_value.execute.return_value.data = [
-                {"passenger_id": "passenger-1"},
-                {"passenger_id": "passenger-2"},
-            ]
-
             def fake_table(name):
                 tm = MagicMock()
                 if name == "user_profiles":
-                    tm.select.return_value.eq.return_value = profile_query
+                    tm.select.return_value.eq.return_value.execute.return_value.data = [{"id": FAKE_PROFILE_ID}]
                 elif name == "rides":
-                    tm.select.return_value.eq.return_value.eq.return_value = existing_query
+                    tm.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = [
+                        {"id": "ride-1", "destination": "Bristol"}
+                    ]
                     tm.update.return_value.eq.return_value.execute.return_value.data = [{"status": "cancelled"}]
                 elif name == "bookings":
-                    tm.select.return_value.eq.return_value = bookings_query
+                    tm.select.return_value.eq.return_value.neq.return_value.execute.return_value.data = [
+                        {"passenger_id": "passenger-1"},
+                        {"passenger_id": "passenger-2"},
+                    ]
                 return tm
 
             mock_sb.table.side_effect = fake_table
