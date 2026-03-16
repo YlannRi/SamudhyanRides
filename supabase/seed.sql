@@ -1,0 +1,2 @@
+-- Intentionally empty.
+-- Database tests insert the rows they need inside each transaction-scoped file.

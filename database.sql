@@ -71,14 +71,16 @@ alter table public.user_profiles enable row level security;
 create policy "Users can view their own profile"
 on public.user_profiles
 for select
-using ( auth.uid() = auth_user_id );
+to authenticated
+using ( (select auth.uid()) = auth_user_id );
 
 -- Users can update their own profile
 create policy "Users can update their own profile"
 on public.user_profiles
 for update
-using ( auth.uid() = auth_user_id )
-with check ( auth.uid() = auth_user_id );
+to authenticated
+using ( (select auth.uid()) = auth_user_id )
+with check ( (select auth.uid()) = auth_user_id );
 
 
 -- ============================================================
@@ -124,3 +126,39 @@ create table public.notifications (
 );
 
 create index idx_notifications_user on public.notifications(user_id);
+
+alter table public.notifications enable row level security;
+
+create policy "Users can view their own notifications"
+on public.notifications
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.user_profiles profiles
+    where profiles.id = notifications.user_id
+      and profiles.auth_user_id = (select auth.uid())
+  )
+);
+
+create policy "Users can update their own notifications"
+on public.notifications
+for update
+to authenticated
+using (
+  exists (
+    select 1
+    from public.user_profiles profiles
+    where profiles.id = notifications.user_id
+      and profiles.auth_user_id = (select auth.uid())
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.user_profiles profiles
+    where profiles.id = notifications.user_id
+      and profiles.auth_user_id = (select auth.uid())
+  )
+);

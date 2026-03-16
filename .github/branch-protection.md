@@ -20,6 +20,7 @@ Apply the same rule to `main` and `develop`.
 
 Use these workflow job names as required checks:
 
+- `database`
 - `backend`
 - `frontend`
 - `frontend-e2e`

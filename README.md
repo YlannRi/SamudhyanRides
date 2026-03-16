@@ -50,3 +50,31 @@ Which allows to view all endpoints, send test requests and inspect responses
 ### 3️⃣ Access the frontend
 
 [http://localhost:5173](http://localhost:5173)
+
+## Database Tests
+
+The repo now includes pgTAP database tests under `supabase/tests/*.sql`.
+
+### 1ï¸âƒ£ Start Docker Desktop
+
+Supabase local development uses Docker. Make sure Docker Desktop is running first.
+
+### 2ï¸âƒ£ Install root dependencies
+
+From the repo root:
+
+`npm ci`
+
+### 3ï¸âƒ£ Start the local Supabase stack
+
+`npm run db:start`
+
+### 4ï¸âƒ£ Reset the local database to the checked-in schema
+
+`npm run db:reset`
+
+The local schema lives in `supabase/migrations/` and currently mirrors `database.sql`.
+
+### 5ï¸âƒ£ Run pgTAP
+
+`npm run db:test`
