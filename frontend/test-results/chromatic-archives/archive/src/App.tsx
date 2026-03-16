@@ -1,6 +1,6 @@
-import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/App.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=b8f2434d"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/src/App.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=c85c9c72"; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
 var _s = $RefreshSig$();
-import __vite__cjsImport1_react from "/node_modules/.vite/deps/react.js?v=b8f2434d"; const React = __vite__cjsImport1_react.__esModule ? __vite__cjsImport1_react.default : __vite__cjsImport1_react; const useEffect = __vite__cjsImport1_react["useEffect"]; const useState = __vite__cjsImport1_react["useState"];
+import __vite__cjsImport1_react from "/node_modules/.vite/deps/react.js?v=c85c9c72"; const React = __vite__cjsImport1_react.__esModule ? __vite__cjsImport1_react.default : __vite__cjsImport1_react; const useEffect = __vite__cjsImport1_react["useEffect"]; const useState = __vite__cjsImport1_react["useState"];
 import "/src/App.css";
 import HomePage from "/src/HomePage.tsx";
 import AccountPage from "/src/AccountPage.tsx";
@@ -28,7 +28,7 @@ import {
   subscribeToIncomingNotifications
 } from "/src/lib/notifications.ts";
 import { areSameChatLink, buildChatPath, parseChatLink } from "/src/lib/chatRoutes.ts";
-import { SpeedInsights } from "/node_modules/.vite/deps/@vercel_speed-insights_react.js?v=b8f2434d";
+import { SpeedInsights } from "/node_modules/.vite/deps/@vercel_speed-insights_react.js?v=1e22aed8";
 const CHAT_TITLE_PREFIX = "New message from ";
 const getChatToastSenderName = (title) => {
   if (title.startsWith(CHAT_TITLE_PREFIX)) {
