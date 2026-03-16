@@ -20,10 +20,14 @@ Apply the same rule to `main` and `develop`.
 
 Use these workflow job names as required checks:
 
+- `secret-scan`
+- `dependency-audit`
 - `database`
 - `backend`
 - `frontend`
 - `frontend-e2e`
+- `codeql-python`
+- `codeql-javascript`
 
 ## Coverage gates enforced by CI
 

@@ -121,6 +121,28 @@ The first-pass E2E coverage includes:
 There is also a manual and reusable workflow at `.github/workflows/post-deploy-smoke.yml`.
 Use it after deployment, or call it from a future deployment workflow once deployment is automated in GitHub Actions.
 
+## Security Gates
+
+The repo now includes a basic security baseline in GitHub Actions.
+
+CI gates now cover:
+
+- secret scanning with `gitleaks`
+- backend dependency vulnerability scanning with `pip-audit`
+- root and frontend dependency vulnerability scanning with `npm audit`
+
+There is also a separate CodeQL workflow for static security analysis of:
+
+- Python backend code
+- JavaScript / TypeScript frontend code
+
+Dependency update automation is configured in `.github/dependabot.yml` for:
+
+- GitHub Actions
+- root `npm`
+- `frontend` `npm`
+- `backend` `pip`
+
 ## Performance Testing
 
 The repo now includes a backend performance harness under `backend/perf/`.
