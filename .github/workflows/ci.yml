@@ -88,7 +88,7 @@ jobs:
         run: pytest tests/test_api_contracts.py
 
       - name: Upload generated OpenAPI artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backend-openapi
@@ -157,7 +157,7 @@ jobs:
         run: pytest --cov=app --cov=main --cov-report=term-missing --cov-report=xml --cov-fail-under=90
 
       - name: Upload backend coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backend-coverage
@@ -189,7 +189,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload frontend coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: frontend-coverage
@@ -233,7 +233,7 @@ jobs:
         run: npm run test:a11y
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
