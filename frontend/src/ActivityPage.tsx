@@ -158,10 +158,15 @@ const Modal: React.FC<{
 
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const [inner, setInner] = useState<ModalState>(state);
+  const doneTimeoutRef = useRef<number | null>(null);
+  const focusTimeoutRef = useRef<number | null>(null);
 
   const succeed = (icon: string, title: string, sub: string) => {
     setInner({ type: 'success', icon, title, sub });
-    setTimeout(onDone, 1400);
+    if (doneTimeoutRef.current !== null) {
+      window.clearTimeout(doneTimeoutRef.current);
+    }
+    doneTimeoutRef.current = window.setTimeout(onDone, 1400);
   };
 
   const isSuccess = inner.type === 'success';
@@ -189,8 +194,17 @@ const Modal: React.FC<{
   })();
 
   React.useEffect(() => {
-    window.setTimeout(() => dialogRef.current?.focus(), 0);
-  }, []);
+    focusTimeoutRef.current = window.setTimeout(() => dialogRef.current?.focus(), 0);
+
+    return () => {
+      if (focusTimeoutRef.current !== null) {
+        window.clearTimeout(focusTimeoutRef.current);
+      }
+      if (doneTimeoutRef.current !== null) {
+        window.clearTimeout(doneTimeoutRef.current);
+      }
+    };
+  }, [onDone]);
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -404,8 +418,27 @@ const TripDetailsPanel: React.FC<{
   const [modal, setModal] = useState<ModalState | null>(null);
   const touchStartY = useRef<number | null>(null);
   const [routeData, setRouteData] = useState<any>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
+  const rideStartedTimeoutRef = useRef<number | null>(null);
 
-  const close = () => { setClosing(true); setTimeout(onClose, 320); };
+  React.useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current !== null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
+      if (rideStartedTimeoutRef.current !== null) {
+        window.clearTimeout(rideStartedTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const close = () => {
+    setClosing(true);
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current);
+    }
+    closeTimeoutRef.current = window.setTimeout(onClose, 320);
+  };
   const openModal = (m: ModalState) => setModal(m);
   const closeModal = () => setModal(null);
   const doneModal = () => {
@@ -413,7 +446,10 @@ const TripDetailsPanel: React.FC<{
     setModal(null);
     close();
     if (completedType === 'start') {
-      window.setTimeout(() => onRideStarted?.(), 320);
+      if (rideStartedTimeoutRef.current !== null) {
+        window.clearTimeout(rideStartedTimeoutRef.current);
+      }
+      rideStartedTimeoutRef.current = window.setTimeout(() => onRideStarted?.(), 320);
     }
   };
 

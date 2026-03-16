@@ -60,7 +60,24 @@ describe('PostRidePage', () => {
     expect(screen.getByLabelText('Seats')).toHaveValue(4);
   });
 
+  it('applies prefill values when provided', () => {
+    render(
+      <PostRidePage
+        prefill={{
+          origin: 'Claverton Down',
+          destination: 'Oldfield Park',
+          arrivalDateTimeLocal: '2026-10-11T09:30',
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText('Start Location')).toHaveValue('Claverton Down');
+    expect(screen.getByLabelText('Destination')).toHaveValue('Oldfield Park');
+    expect(screen.getByLabelText('Destination arrival Date and Time')).toHaveValue('2026-10-11T09:30');
+  });
+
   it('shows an auth error before geocoding when no token is available', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     window.localStorage.removeItem('authToken');
 
     render(<PostRidePage />);
@@ -73,6 +90,8 @@ describe('PostRidePage', () => {
     });
     expect(mockGeocodeAddress).not.toHaveBeenCalled();
     expect(apiFetch).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
   });
 
   it('posts a ride with geocoded coordinates and resets the form on success', async () => {
@@ -109,6 +128,7 @@ describe('PostRidePage', () => {
   });
 
   it('shows an api error returned during submission', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(apiFetch).mockRejectedValueOnce(new Error('Internal Server Error'));
 
     render(<PostRidePage />);
@@ -119,6 +139,27 @@ describe('PostRidePage', () => {
     await waitFor(() => {
       expect(screen.getByText('Internal Server Error')).toBeInTheDocument();
     });
+
+    consoleSpy.mockRestore();
+  });
+
+  it('shows an error when either geocoded location cannot be found', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockGeocodeAddress
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ lat: 51.3811, lng: -2.359 }]);
+
+    render(<PostRidePage />);
+    fillRequiredFields();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Post Ride' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Location not found')).toBeInTheDocument();
+    });
+    expect(apiFetch).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
   });
 
   it('shows a loading state while the request is in flight', async () => {
@@ -144,6 +185,7 @@ describe('PostRidePage', () => {
   });
 
   it('renders string-based submission errors', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(apiFetch).mockRejectedValueOnce('Server string exception');
 
     render(<PostRidePage />);
@@ -154,9 +196,12 @@ describe('PostRidePage', () => {
     await waitFor(() => {
       expect(screen.getByText('Server string exception')).toBeInTheDocument();
     });
+
+    consoleSpy.mockRestore();
   });
 
   it('clears an old error after a later successful submission', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(apiFetch)
       .mockRejectedValueOnce(new Error('First attempt failed'))
       .mockResolvedValueOnce({ success: true });
@@ -176,5 +221,7 @@ describe('PostRidePage', () => {
       expect(screen.queryByText('First attempt failed')).not.toBeInTheDocument();
       expect(screen.getByText('Ride successfully posted!')).toBeInTheDocument();
     });
+
+    consoleSpy.mockRestore();
   });
 });

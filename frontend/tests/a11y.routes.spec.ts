@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from "@chromatic-com/playwright";
+import type { Page } from '@playwright/test';
 import { PUBLIC_ROUTES, AUTH_ROUTES } from './routes';
 import { expectNoViolations, seedAuth, navigateAndSettle } from './a11y-helpers';
 import { installApiMocks } from './mocks/apiMock';

@@ -113,6 +113,40 @@ describe('ChatPage Component', () => {
     });
   });
 
+  it('falls back to an empty chat when history loading fails and restores unsent input after a REST error', async () => {
+    vi.mocked(getAuthToken).mockReturnValue(null);
+    vi.mocked(apiFetch).mockImplementation(async (url) => {
+      if (url === 'users/me') return [];
+      if (url === 'rides/101/chat') throw new Error('No chat yet');
+      if (url === 'rides/101/chat/message') throw new Error('Send failed');
+      if (url.includes('read-by-link')) return {};
+      return [];
+    });
+
+    render(<ChatPage rideId="101" onBack={mockProps.onBack} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('No messages yet. Say hello!')).toBeInTheDocument();
+    });
+
+    expect(buildWebSocketUrl).not.toHaveBeenCalled();
+
+    const input = screen.getByPlaceholderText('Type a message...');
+    fireEvent.change(input, { target: { value: 'Retry me' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith(
+        'rides/101/chat/message',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ message: 'Retry me' }),
+        }),
+      );
+      expect(input).toHaveValue('Retry me');
+    });
+  });
+
   it('sends a message via WebSocket when connected', async () => {
     vi.mocked(apiFetch).mockResolvedValue([]);
 
@@ -188,6 +222,33 @@ describe('ChatPage Component', () => {
     await waitFor(() => {
       expect(screen.getByText('Incoming WS Message')).toBeInTheDocument();
       expect(screen.getByText('Alice')).toBeInTheDocument();
+    });
+  });
+
+  it('ignores duplicate and invalid WebSocket payloads', async () => {
+    vi.mocked(apiFetch).mockResolvedValue([]);
+    render(<ChatPage {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading messages...')).not.toBeInTheDocument();
+    });
+
+    const incomingMessage = {
+      id: 'ws_msg_duplicate',
+      sender_id: 'user_2',
+      sender_name: 'Alice',
+      message: 'Only once',
+      created_at: new Date().toISOString(),
+    };
+
+    act(() => {
+      mockWsInstance.onmessage({ data: JSON.stringify(incomingMessage) });
+      mockWsInstance.onmessage({ data: JSON.stringify(incomingMessage) });
+      mockWsInstance.onmessage({ data: '{bad json' });
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Only once')).toHaveLength(1);
     });
   });
 

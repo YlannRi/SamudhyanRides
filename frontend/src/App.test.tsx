@@ -230,6 +230,19 @@ describe('App Component', () => {
         expect(notifications.startPolling).toHaveBeenCalled();
       });
     });
+
+    it('starts realtime notifications after login when a token is already stored', async () => {
+      vi.mocked(apiFetch).mockResolvedValueOnce({ is_driver: true });
+
+      render(<App />);
+      localStorage.setItem('authToken', 'session-token');
+      fireEvent.click(screen.getByText('Login'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('home-page')).toBeInTheDocument();
+        expect(notifications.startRealtimeNotifications).toHaveBeenCalledWith('session-token');
+      });
+    });
   });
 
   describe('Authenticated Flow & Routing', () => {
@@ -365,6 +378,101 @@ describe('App Component', () => {
       });
 
       expect(notifications.markReadByLink).toHaveBeenCalledWith('/chat/ride-123?participant=passenger-9');
+    });
+
+    it('marks a notification as read immediately when it targets the active chat', async () => {
+      window.history.replaceState({}, '', '/chat/ride-123?participant=passenger-9');
+      vi.mocked(apiFetch).mockResolvedValue({ is_driver: true });
+
+      render(<App />);
+      fireEvent.click(screen.getByText('Login'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('chat-page')).toHaveTextContent('Chat ride-123 - passenger-9');
+      });
+
+      act(() => {
+        (notifications as any).__triggerIncoming({
+          id: 'notif-active-chat',
+          user_id: 'profile-1',
+          type: 'chat',
+          title: 'New message from Alex Driver',
+          body: 'Seen in the open chat.',
+          created_at: new Date().toISOString(),
+          read: false,
+          link: '/chat/ride-123?participant=passenger-9',
+        });
+      });
+
+      expect(notifications.markReadByLink).toHaveBeenCalledWith('/chat/ride-123?participant=passenger-9');
+      expect(screen.queryByText('Seen in the open chat.')).not.toBeInTheDocument();
+    });
+
+    it('ignores incomplete notifications and deduplicates repeated chat toasts', async () => {
+      vi.mocked(apiFetch).mockResolvedValueOnce({ is_driver: true });
+
+      render(<App />);
+      fireEvent.click(screen.getByText('Login'));
+      await waitFor(() => expect(screen.getByTestId('home-page')).toBeInTheDocument());
+
+      act(() => {
+        (notifications as any).__triggerIncoming({
+          id: 'notif-system',
+          type: 'system',
+          title: 'System update',
+          body: 'Not a chat notification.',
+          link: '/activity',
+        });
+        (notifications as any).__triggerIncoming({
+          id: 'notif-no-link',
+          type: 'chat',
+          title: 'New message from Missing Link',
+          body: 'No link means ignore me.',
+        });
+        (notifications as any).__triggerIncoming({
+          id: 'notif-duplicate',
+          type: 'chat',
+          title: 'New message from Pat',
+          body: 'First delivery.',
+          link: '/chat/ride-123?participant=user-1',
+        });
+        (notifications as any).__triggerIncoming({
+          id: 'notif-duplicate',
+          type: 'chat',
+          title: 'New message from Pat',
+          body: 'Duplicate delivery.',
+          link: '/chat/ride-123?participant=user-1',
+        });
+      });
+
+      expect(screen.queryByText('Not a chat notification.')).not.toBeInTheDocument();
+      expect(screen.queryByText('No link means ignore me.')).not.toBeInTheDocument();
+      expect(screen.getByText('First delivery.')).toBeInTheDocument();
+      expect(screen.queryByText('Duplicate delivery.')).not.toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Open chat from Pat' })).toHaveLength(1);
+    });
+
+    it('uses the full notification title when a chat title has no default prefix', async () => {
+      vi.mocked(apiFetch).mockResolvedValueOnce({ is_driver: true });
+
+      render(<App />);
+      fireEvent.click(screen.getByText('Login'));
+      await waitFor(() => expect(screen.getByTestId('home-page')).toBeInTheDocument());
+
+      act(() => {
+        (notifications as any).__triggerIncoming({
+          id: 'notif-full-title',
+          user_id: 'profile-1',
+          type: 'chat',
+          title: 'Driver Alex',
+          body: 'Message body.',
+          created_at: new Date().toISOString(),
+          read: false,
+          link: '/chat/ride-987?participant=user-2',
+        });
+      });
+
+      expect(await screen.findByRole('button', { name: 'Open chat from Driver Alex' })).toBeInTheDocument();
     });
 
     it('handles Inbox navigation, navigateFromLink parsing, and deep links', async () => {

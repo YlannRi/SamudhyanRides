@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
-import { expect } from '@playwright/test';
+import { expect } from "@chromatic-com/playwright";
 
 /** Run an axe scan targeting WCAG A + AA (including 2.1). */
 export async function runAxe(page: Page) {

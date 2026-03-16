@@ -1,9 +1,10 @@
+import os
 import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from unittest.mock import MagicMock, patch
 
-from app.accounts.dependencies import get_current_user
+from app.accounts.dependencies import _get_admin_emails, get_current_user, require_admin_user
 
 
 class TestDependencies:
@@ -54,3 +55,20 @@ class TestDependencies:
 
         assert exc.value.status_code == 401
         assert "Invalid token" in exc.value.detail
+
+    def test_get_admin_emails_normalizes_and_filters_values(self):
+        with patch.dict(os.environ, {"ADMIN_EMAILS": " ADMIN@bath.ac.uk, second@bath.ac.uk , ,THIRD@bath.ac.uk "}, clear=False):
+            assert _get_admin_emails() == {"admin@bath.ac.uk", "second@bath.ac.uk", "third@bath.ac.uk"}
+
+    def test_require_admin_user_allows_admin_email(self):
+        with patch.dict(os.environ, {"ADMIN_EMAILS": "admin@bath.ac.uk"}, clear=False):
+            current_user = {"email": " Admin@bath.ac.uk "}
+            assert require_admin_user(current_user) is current_user
+
+    def test_require_admin_user_rejects_non_admin_email(self):
+        with patch.dict(os.environ, {"ADMIN_EMAILS": "admin@bath.ac.uk"}, clear=False):
+            with pytest.raises(HTTPException) as exc:
+                require_admin_user({"email": "user@bath.ac.uk"})
+
+        assert exc.value.status_code == 403
+        assert exc.value.detail == "Admin access required"

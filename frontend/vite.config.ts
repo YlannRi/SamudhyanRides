@@ -22,7 +22,6 @@ export default defineConfig({
       reporter: ['text', 'lcov', 'html'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
-        'src/components/Map/**',
         'node_modules/**',
         'dist/**'
       ],

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import InboxPage from './InboxPage';
 import { fetchNotifications, getNotifications, markReadByLink, subscribe } from './lib/notifications';
@@ -79,6 +79,54 @@ describe('InboxPage Component', () => {
     });
   });
 
+  it('updates the inbox when the notification store subscription fires and supports booking/default types', async () => {
+    let onStoreUpdate: (() => void) | undefined;
+
+    vi.mocked(subscribe).mockImplementation((callback) => {
+      onStoreUpdate = callback;
+      return vi.fn();
+    });
+    vi.mocked(fetchNotifications).mockResolvedValueOnce([]);
+
+    render(<InboxPage {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('No notifications yet')).toBeInTheDocument();
+    });
+
+    vi.mocked(getNotifications).mockReturnValue([
+      {
+        id: 'booking-1',
+        user_id: 'user-1',
+        type: 'booking',
+        title: 'Booking received',
+        body: 'A passenger requested your ride.',
+        created_at: new Date().toISOString(),
+        read: false,
+        link: '/activity',
+      },
+      {
+        id: 'misc-1',
+        user_id: 'user-1',
+        type: 'system',
+        title: 'General update',
+        body: 'Something changed in your account.',
+        created_at: new Date().toISOString(),
+        read: true,
+        link: '/account',
+      },
+    ]);
+
+    act(() => {
+      onStoreUpdate?.();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Booking received')).toBeInTheDocument();
+      expect(screen.getByText('General update')).toBeInTheDocument();
+    });
+  });
+
   it('marks a notification as read and navigates when clicked', async () => {
     const mockNotifications = [
       {
@@ -109,6 +157,32 @@ describe('InboxPage Component', () => {
       expect(markReadByLink).toHaveBeenCalledWith('/chat/123');
       expect(mockProps.onNavigate).toHaveBeenCalledWith('/chat/123');
     });
+  });
+
+  it('does not attempt to navigate or mark a notification as read when it has no link', async () => {
+    vi.mocked(fetchNotifications).mockResolvedValueOnce([
+      {
+        id: '1',
+        user_id: 'user-1',
+        type: 'chat',
+        title: 'Informational message',
+        body: 'This message is not clickable.',
+        created_at: new Date().toISOString(),
+        read: false,
+        link: null,
+      },
+    ]);
+
+    render(<InboxPage {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Informational message')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Informational message/i }));
+
+    expect(markReadByLink).not.toHaveBeenCalled();
+    expect(mockProps.onNavigate).not.toHaveBeenCalled();
   });
 
   it('calls onBack when the back button is clicked', async () => {

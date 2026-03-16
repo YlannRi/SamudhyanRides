@@ -66,6 +66,7 @@ describe('LoginPage Component', () => {
   });
 
   it('displays an error message on failed login', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(apiFetch).mockRejectedValueOnce(new Error('Invalid login credentials.'));
 
     render(<LoginPage {...mockProps} />);
@@ -79,6 +80,8 @@ describe('LoginPage Component', () => {
       expect(screen.getByText('Invalid login credentials.')).toBeInTheDocument();
       expect(mockProps.onAuthSuccess).not.toHaveBeenCalled();
     });
+
+    consoleSpy.mockRestore();
   });
 
   it('shows an error if passwords do not match during signup', async () => {
@@ -98,6 +101,24 @@ describe('LoginPage Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Passwords do not match.')).toBeInTheDocument();
+      expect(apiFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  it('shows an error if the signup form is missing first or last name', async () => {
+    render(<LoginPage {...mockProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'john@bath.ac.uk' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'password123' } });
+
+    const form = screen.getByRole('button', { name: 'Create account' }).closest('form');
+    expect(form).not.toBeNull();
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      expect(screen.getByText('Please provide your first name and last name.')).toBeInTheDocument();
       expect(apiFetch).not.toHaveBeenCalled();
     });
   });
@@ -131,7 +152,28 @@ describe('LoginPage Component', () => {
     });
   });
 
+  it('uses the default success message when signup succeeds without a response message', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({});
+
+    render(<LoginPage {...mockProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Jane' } });
+    fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Smith' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'jane@bath.ac.uk' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'pass123' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'pass123' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Account created! Please check your email to verify and log in.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Continue' })).toBeInTheDocument();
+    });
+  });
+
   it('throws an error if login succeeds but no token is returned', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     // Covers Line 81: Else branch throwing manual error
     vi.mocked(apiFetch).mockResolvedValueOnce({ success: true, message: 'Where is the token?' });
 
@@ -146,6 +188,8 @@ describe('LoginPage Component', () => {
       expect(screen.getByText('Invalid login credentials.')).toBeInTheDocument();
       expect(mockProps.onAuthSuccess).not.toHaveBeenCalled();
     });
+
+    consoleSpy.mockRestore();
   });
 
   it('handles auto-login failure after successful driver registration', async () => {
@@ -171,6 +215,31 @@ describe('LoginPage Component', () => {
       // Should cleanly revert to login mode
       expect(screen.queryByLabelText('First name')).not.toBeInTheDocument();
     });
+  });
+
+  it('shows a missing-token error when auto-login succeeds without returning a token', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(apiFetch).mockResolvedValueOnce({ message: 'Success' });
+    vi.mocked(apiFetch).mockResolvedValueOnce({});
+
+    render(<LoginPage {...mockProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign up' }));
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Mark' } });
+    fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Taylor' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'mark@bath.ac.uk' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'driverpass' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'driverpass' } });
+    fireEvent.click(screen.getByLabelText('Do you want to sign up as a driver?'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Auto-login failed: missing token')).toBeInTheDocument();
+      expect(mockProps.onStartDriverSignup).not.toHaveBeenCalled();
+    });
+
+    consoleSpy.mockRestore();
   });
 
   it('toggles back to login mode from signup mode', () => {

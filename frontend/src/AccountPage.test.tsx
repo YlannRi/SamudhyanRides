@@ -7,6 +7,12 @@ vi.mock('./lib/api', () => ({
   apiFetch: vi.fn(),
 }));
 
+async function waitForAccountLoad() {
+  await waitFor(() => {
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+  });
+}
+
 describe('AccountPage Component', () => {
   const mockProps = {
     onLogout: vi.fn(),
@@ -52,6 +58,7 @@ describe('AccountPage Component', () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 5.0 }]);
 
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Safety Alarm'));
 
@@ -60,6 +67,7 @@ describe('AccountPage Component', () => {
   });
 
   it('handles API fetch error gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(apiFetch).mockRejectedValueOnce(new Error('Network error'));
 
     render(<AccountPage {...mockProps} />);
@@ -68,6 +76,7 @@ describe('AccountPage Component', () => {
       expect(screen.getByText('Unknown User')).toBeInTheDocument();
       expect(screen.getByText('★ N/A')).toBeInTheDocument();
     });
+    consoleSpy.mockRestore();
   });
 
   it('handles empty API response gracefully', async () => {
@@ -80,9 +89,47 @@ describe('AccountPage Component', () => {
     });
   });
 
+  it('persists trusted contacts returned by the profile response', async () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+
+    vi.mocked(apiFetch).mockResolvedValueOnce([{
+      first_name: 'Alex',
+      rider_rating: 4.85,
+      trusted_contacts: [
+        {
+          id: 'profile-contact-1',
+          firstName: 'Priya',
+          lastName: 'Patel',
+          phone: '07111111111',
+          isPrimary: true,
+        },
+      ],
+    }]);
+
+    render(<AccountPage {...mockProps} />);
+
+    await waitFor(() => {
+      expect(setItemSpy).toHaveBeenCalledWith(
+        'trustedContacts',
+        JSON.stringify([
+          {
+            id: 'profile-contact-1',
+            firstName: 'Priya',
+            lastName: 'Patel',
+            phone: '07111111111',
+            address: undefined,
+            email: undefined,
+            isPrimary: true,
+          },
+        ]),
+      );
+    });
+  });
+
   it('calls onOpenSettings when Settings is clicked', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Settings'));
     expect(mockProps.onOpenSettings).toHaveBeenCalledTimes(1);
@@ -91,6 +138,7 @@ describe('AccountPage Component', () => {
   it('calls onOpenTimetable when timetable card is clicked', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Your timetable'));
     expect(mockProps.onOpenTimetable).toHaveBeenCalledTimes(1);
@@ -99,6 +147,7 @@ describe('AccountPage Component', () => {
   it('calls onOpenSafetyCheckup when safety check-up card is clicked', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Safety check-up'));
     expect(mockProps.onOpenSafetyCheckup).toHaveBeenCalledTimes(1);
@@ -107,6 +156,7 @@ describe('AccountPage Component', () => {
   it('calls logout endpoint and triggers onLogout', async () => {
     vi.mocked(apiFetch).mockResolvedValue([{ first_name: 'Alex', rider_rating: 4.0 }]);
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Logout'));
 
@@ -117,22 +167,26 @@ describe('AccountPage Component', () => {
   });
 
   it('still calls onLogout if logout API throws', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(apiFetch)
       .mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }])
       .mockRejectedValueOnce(new Error('Logout failed'));
 
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Logout'));
 
     await waitFor(() => {
       expect(mockProps.onLogout).toHaveBeenCalledTimes(1);
     });
+    consoleSpy.mockRestore();
   });
 
   it('calls 999 when Call 999 button is clicked in safety toolkit', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Safety Alarm'));
     fireEvent.click(screen.getByText('Call 999'));
@@ -143,6 +197,7 @@ describe('AccountPage Component', () => {
   it('calls trusted contact when button is clicked in safety toolkit', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Safety Alarm'));
     fireEvent.click(screen.getByText('Call your trusted contact (Jane Doe)'));
@@ -153,6 +208,7 @@ describe('AccountPage Component', () => {
   it('calls campus security when button is clicked in safety toolkit', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Safety Alarm'));
     fireEvent.click(screen.getByText('Call campus security (01225 383999)'));
@@ -163,6 +219,7 @@ describe('AccountPage Component', () => {
   it('closes safety toolkit when Close is clicked', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Safety Alarm'));
     expect(screen.getByText('Safety Toolkit')).toBeInTheDocument();
@@ -174,6 +231,7 @@ describe('AccountPage Component', () => {
   it('closes safety toolkit when backdrop is clicked', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Safety Alarm'));
     fireEvent.click(document.querySelector('.modal-backdrop')!);
@@ -190,6 +248,7 @@ describe('AccountPage Component', () => {
 
     vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
     render(<AccountPage {...mockProps} />);
+    await waitForAccountLoad();
 
     fireEvent.click(screen.getByText('Safety Alarm'));
 
@@ -201,6 +260,7 @@ describe('AccountPage Component', () => {
     it('handles keyboard events for InfoCard accessibility', async () => {
       vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
       render(<AccountPage {...mockProps} />);
+      await waitForAccountLoad();
 
       const timetableCard = screen.getByText('Your timetable').closest('.info-card');
       expect(timetableCard).toBeInTheDocument();
@@ -236,6 +296,7 @@ describe('AccountPage Component', () => {
 
       vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
       render(<AccountPage {...mockProps} />);
+      await waitForAccountLoad();
 
       fireEvent.click(screen.getByText('Safety Alarm'));
       // Should default to disabled call button
@@ -252,6 +313,7 @@ describe('AccountPage Component', () => {
 
       vi.mocked(apiFetch).mockResolvedValueOnce([{ first_name: 'Alex', rider_rating: 4.0 }]);
       render(<AccountPage {...mockProps} />);
+      await waitForAccountLoad();
 
       fireEvent.click(screen.getByText('Safety Alarm'));
       expect(screen.getByText('Call your trusted contact (John Doe)')).toBeInTheDocument();

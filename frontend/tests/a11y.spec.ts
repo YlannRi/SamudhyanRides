@@ -1,4 +1,5 @@
-import { test, type Page } from '@playwright/test';
+import { test } from "@chromatic-com/playwright";
+import type { Page } from '@playwright/test';
 import { expectNoViolations, seedAuth, navigateAndSettle } from './a11y-helpers';
 import { installApiMocks } from './mocks/apiMock';
 

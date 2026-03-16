@@ -1,8 +1,12 @@
 import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import JourneyPage from './JourneyPage';
 import { apiFetch } from './lib/api';
+
+const journeyMapMock = vi.hoisted(() => ({
+  byRideId: new Map<number, unknown>(),
+}));
 
 vi.mock('./lib/api', () => ({
   apiFetch: vi.fn(),
@@ -50,9 +54,27 @@ vi.mock('./App.tsx', () => ({
   ),
 }));
 
-vi.mock('./components/Map/RideRenderMap', () => ({
-  RideRenderMap: ({ rideId }: { rideId: number }) => <div data-testid={`map-${rideId}`}>Mock Map</div>,
-}));
+vi.mock('./components/Map/RideRenderMap', async () => {
+  const React = await import('react');
+
+  return {
+    RideRenderMap: ({
+      rideId,
+      onRouteData,
+    }: {
+      rideId: number;
+      onRouteData?: (data: unknown) => void;
+    }) => {
+      React.useEffect(() => {
+        if (journeyMapMock.byRideId.has(rideId)) {
+          onRouteData?.(journeyMapMock.byRideId.get(rideId));
+        }
+      }, [rideId, onRouteData]);
+
+      return <div data-testid={`map-${rideId}`}>Mock Map</div>;
+    },
+  };
+});
 
 const defaultUserTrips = [
   {
@@ -100,6 +122,7 @@ function installJourneyApiMock(options?: {
   driverRides?: any[];
   vehicleByRideId?: Record<number, { car_model?: string; number_plate?: string }>;
   completeRideError?: Error;
+  customHandler?: (path: string, requestInit?: RequestInit) => Promise<unknown> | unknown;
 }) {
   const userTrips = options?.userTrips ?? defaultUserTrips;
   const driverRides = options?.driverRides ?? defaultDriverRides;
@@ -108,8 +131,15 @@ function installJourneyApiMock(options?: {
     102: { car_model: 'Honda Jazz', number_plate: 'XY98 ZZZ' },
   };
 
-  vi.mocked(apiFetch).mockImplementation(async (endpoint) => {
+  vi.mocked(apiFetch).mockImplementation(async (endpoint, requestInit) => {
     const path = String(endpoint);
+
+    if (options?.customHandler) {
+      const customResult = await options.customHandler(path, requestInit);
+      if (customResult !== undefined) {
+        return customResult;
+      }
+    }
 
     if (path === 'bookings/me') {
       return userTrips;
@@ -142,11 +172,24 @@ async function waitForJourneyLoad() {
   });
 }
 
+function setJourneyMapData(rideId: number, data: unknown) {
+  journeyMapMock.byRideId.set(rideId, data);
+}
+
+function formatDisplayTime(iso: string) {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 describe('JourneyPage', () => {
   const onDriverSignup = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    journeyMapMock.byRideId.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders the current rider journey view after loading', async () => {
@@ -162,6 +205,30 @@ describe('JourneyPage', () => {
     expect(screen.getByText('Toyota Prius')).toBeInTheDocument();
     expect(screen.getByText('AB12 CDE')).toBeInTheDocument();
     expect(screen.getByTestId('map-101')).toBeInTheDocument();
+  });
+
+  it('uses route data to show estimated pickup times and opens the rider chat', async () => {
+    installJourneyApiMock();
+    const onOpenChat = vi.fn();
+
+    setJourneyMapData(101, {
+      times: {
+        pickups: [{ booking_ids: [1], estimated_time: '2026-03-04T12:05:00Z' }],
+      },
+    });
+
+    render(<JourneyPage canUseDriverMode={true} onDriverSignup={onDriverSignup} onOpenChat={onOpenChat} />);
+
+    await waitForJourneyLoad();
+
+    await waitFor(() => {
+      expect(screen.getByText('Estimated Pickup')).toBeInTheDocument();
+    });
+    expect(screen.getByText(formatDisplayTime('2026-03-04T12:05:00Z'))).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Message Driver/i }));
+
+    expect(onOpenChat).toHaveBeenCalledWith('101');
   });
 
   it('shows the empty rider state when there are no active user trips', async () => {
@@ -200,6 +267,12 @@ describe('JourneyPage', () => {
       expect(screen.getByText('Oldfield Park')).toBeInTheDocument();
       expect(screen.getByText('5678')).toBeInTheDocument();
     });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rider' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
   });
 
   it('marks a passenger as picked up when the driver confirms pickup', async () => {
@@ -235,6 +308,19 @@ describe('JourneyPage', () => {
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith('bookings/rides/201/complete', { method: 'POST' });
       expect(screen.queryByText('Route: City Centre')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows the empty driver state when there are no active drives', async () => {
+    installJourneyApiMock({ driverRides: [] });
+
+    render(<JourneyPage canUseDriverMode={true} onDriverSignup={onDriverSignup} />);
+
+    await waitForJourneyLoad();
+    fireEvent.click(screen.getByRole('button', { name: 'Driver' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('No Active Drives')).toBeInTheDocument();
     });
   });
 
@@ -313,6 +399,101 @@ describe('JourneyPage', () => {
     });
   });
 
+  it('supports driver passenger tabs, route data, and chat callbacks', async () => {
+    installJourneyApiMock({
+      driverRides: [
+        {
+          id: 201,
+          status: 'in_progress',
+          destination: 'City Centre',
+          bookings: [
+            {
+              id: 301,
+              status: 'confirmed',
+              pickup_location: 'Oldfield Park',
+              pickup_code: '5678',
+              passenger_id: 'passenger-301',
+              passenger: { id: 'passenger-301', first_name: 'Jane', last_name: 'Smith', rider_rating: '4.8' },
+            },
+            {
+              id: 302,
+              status: 'confirmed',
+              pickup_location: 'Weston',
+              pickup_code: '2468',
+              passenger_id: 'passenger-302',
+              passenger: { id: 'passenger-302', first_name: 'Mark', last_name: 'Stone', rider_rating: '4.1' },
+            },
+          ],
+        },
+      ],
+    });
+    const onOpenChat = vi.fn();
+
+    setJourneyMapData(201, {
+      times: {
+        driver_leave: '2026-03-04T11:55:00Z',
+      },
+    });
+
+    render(<JourneyPage canUseDriverMode={true} onDriverSignup={onDriverSignup} onOpenChat={onOpenChat} />);
+
+    await waitForJourneyLoad();
+    fireEvent.click(screen.getByRole('button', { name: 'Driver' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(`Leave By ${formatDisplayTime('2026-03-04T11:55:00Z')}`)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mark' }));
+    expect(screen.getByText('Mark Stone')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'message Message' }));
+
+    expect(onOpenChat).toHaveBeenCalledWith('201', 'passenger-302');
+  });
+
+  it('falls back to default vehicle details when vehicle enrichment fails', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    installJourneyApiMock({
+      customHandler: async (path) => {
+        if (path === 'bookings/rides/101/vehicle') {
+          throw new Error('Vehicle unavailable');
+        }
+
+        return undefined;
+      },
+    });
+
+    render(<JourneyPage canUseDriverMode={true} onDriverSignup={onDriverSignup} />);
+
+    await waitForJourneyLoad();
+
+    expect(screen.getByText('Vauxhall Corsa')).toBeInTheDocument();
+    expect(screen.getByText('DC14 HAE')).toBeInTheDocument();
+    expect(consoleSpy).toHaveBeenCalledWith('Vehicle fetch failed for ride', 101, expect.any(Error));
+
+    consoleSpy.mockRestore();
+  });
+
+  it('forces controlled driver mode back to rider mode when driver access is revoked', async () => {
+    installJourneyApiMock();
+    const onModeChange = vi.fn();
+
+    render(
+      <JourneyPage
+        canUseDriverMode={false}
+        onDriverSignup={onDriverSignup}
+        mode="driver"
+        onModeChange={onModeChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onModeChange).toHaveBeenCalledWith('user');
+    });
+  });
+
   it('logs fetch failures and falls back to the empty state', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(apiFetch).mockRejectedValue(new Error('Network Down'));
@@ -329,6 +510,7 @@ describe('JourneyPage', () => {
 
   it('alerts the user when completing a ride fails', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     installJourneyApiMock({ completeRideError: new Error('Could not complete') });
 
     render(<JourneyPage canUseDriverMode={true} onDriverSignup={onDriverSignup} />);
@@ -345,6 +527,7 @@ describe('JourneyPage', () => {
       expect(alertSpy).toHaveBeenCalledWith('Could not complete the ride. Please try again.');
     });
 
+    consoleSpy.mockRestore();
     alertSpy.mockRestore();
   });
 });

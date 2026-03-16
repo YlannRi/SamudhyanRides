@@ -104,6 +104,26 @@ describe('SafetyCheckupPage Component', () => {
     expect(window.localStorage.getItem('pinCode')).toBeNull();
   });
 
+  it('supports keyboard navigation and closes the Add Contact modal from the backdrop', () => {
+    const { container } = render(<SafetyCheckupPage onBack={mockOnBack} />);
+
+    const trustedContactsRow = screen.getByText('Trusted contacts').closest('[role="button"]');
+    expect(trustedContactsRow).not.toBeNull();
+
+    fireEvent.keyDown(trustedContactsRow!, { key: 'Enter' });
+    expect(screen.getByText('Your contacts')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add contact' }));
+
+    const addressInput = screen.getByLabelText('Address (optional)');
+    fireEvent.change(addressInput, { target: { value: '1 High Street, Bath' } });
+    expect(addressInput).toHaveValue('1 High Street, Bath');
+
+    fireEvent.click(container.querySelector('.modal-backdrop') as HTMLElement);
+
+    expect(screen.queryByText('Add trusted contact')).not.toBeInTheDocument();
+  });
+
   it('allows adding a trusted contact and setting them as primary', async () => {
     render(<SafetyCheckupPage onBack={mockOnBack} />);
 
@@ -157,6 +177,53 @@ describe('SafetyCheckupPage Component', () => {
     await waitFor(() => {
       expect(screen.getByText('Amy Pond')).toBeInTheDocument();
     });
+  });
+
+  it('logs profile load and preference save failures without breaking contact updates', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    window.localStorage.setItem('authToken', 'fake-token');
+    vi.mocked(apiFetch).mockImplementation(async (url) => {
+      if (url === 'users/me') {
+        throw new Error('load failed');
+      }
+
+      if (url === 'users/me/preferences') {
+        throw new Error('save failed');
+      }
+
+      return {};
+    });
+
+    render(<SafetyCheckupPage onBack={mockOnBack} />);
+    fireEvent.click(screen.getByText('Trusted contacts'));
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('Error fetching trusted contacts:', expect.any(Error));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add contact' }));
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'John' } });
+    fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Doe' } });
+    fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: '07700900000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      'users/me/preferences',
+      expect.objectContaining({
+        method: 'PUT',
+      }),
+    );
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('Error saving trusted contacts:', expect.any(Error));
+    });
+
+    consoleSpy.mockRestore();
   });
 
   it('disables the Add Contact button if required fields are missing', () => {

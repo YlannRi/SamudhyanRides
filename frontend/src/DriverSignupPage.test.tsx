@@ -67,7 +67,7 @@ describe('DriverSignupPage Component', () => {
       'driverApplication',
       JSON.stringify({
         driver: { phone_number: '+447000000000', address: 'Saved Address 123' },
-        vehicle: { make: 'Honda' },
+        vehicle: { make: 'Honda', year: 2018 },
       })
     );
 
@@ -79,6 +79,7 @@ describe('DriverSignupPage Component', () => {
     expect(screen.getByLabelText(/Phone number/i)).toHaveValue('+447000000000');
     expect(screen.getByLabelText(/Residential address/i)).toHaveValue('Saved Address 123');
     expect(screen.getByLabelText(/Vehicle make/i)).toHaveValue('Honda');
+    expect(screen.getByLabelText(/^Year/i)).toHaveValue(2018);
   });
 
   it('handles invalid JSON in localStorage gracefully', () => {
@@ -167,6 +168,7 @@ describe('DriverSignupPage Component', () => {
       const iban = screen.getByLabelText(/IBAN \(optional\)/i);
       fireEvent.change(iban, { target: { value: 'GB29NWBK60161331926819' } });
       fireEvent.blur(iban);
+      fireEvent.change(iban, { target: { value: 'GB29 NWBK 6016 1331 9268 19' } });
       await waitFor(() => {
         expect(screen.queryByText('Invalid IBAN format.')).not.toBeInTheDocument();
       });
@@ -211,6 +213,54 @@ describe('DriverSignupPage Component', () => {
         fireEvent.blur(input);
       });
     });
+
+    it('marks touched text, file, and optional date fields without leaving false validation errors', async () => {
+      render(<DriverSignupPage {...mockProps} />);
+
+      const firstName = screen.getByLabelText(/^First name/i);
+      fireEvent.blur(firstName);
+      fireEvent.change(firstName, { target: { value: 'J' } });
+      fireEvent.change(firstName, { target: { value: '' } });
+
+      const lastName = screen.getByLabelText(/^Last name/i);
+      fireEvent.blur(lastName);
+      fireEvent.change(lastName, { target: { value: 'D' } });
+      fireEvent.change(lastName, { target: { value: '' } });
+
+      const dummyFile = new File([''], 'id.png', { type: 'image/png' });
+      const requiredFileFields = [
+        /ID document upload.*front/i,
+        /ID document upload.*back/i,
+        /Selfie for identification/i,
+      ];
+
+      requiredFileFields.forEach((label) => {
+        const input = screen.getByLabelText(label);
+        fireEvent.blur(input);
+        fireEvent.change(input, { target: { files: [dummyFile] } });
+        fireEvent.change(input, { target: { files: [] } });
+      });
+
+      const licenseExpiry = screen.getByLabelText(/^Expiry date \(optional\)$/i);
+      fireEvent.blur(licenseExpiry);
+      fireEvent.change(licenseExpiry, { target: { value: '2027-01-01' } });
+      fireEvent.change(licenseExpiry, { target: { value: '' } });
+
+      const insuranceExpiry = screen.getByLabelText(/^Insurance expiry date \(optional\)$/i);
+      fireEvent.blur(insuranceExpiry);
+      fireEvent.change(insuranceExpiry, { target: { value: '2027-01-01' } });
+      fireEvent.change(insuranceExpiry, { target: { value: '' } });
+
+      await waitFor(() => {
+        expect(screen.getByText('First name is required.')).toBeInTheDocument();
+        expect(screen.getByText('Last name is required.')).toBeInTheDocument();
+        expect(screen.getByText('Front image/PDF is required.')).toBeInTheDocument();
+        expect(screen.getByText('Back image/PDF is required.')).toBeInTheDocument();
+        expect(screen.getByText('Selfie is required.')).toBeInTheDocument();
+        expect(screen.queryByText('Invalid expiry date.')).not.toBeInTheDocument();
+        expect(screen.queryByText('Invalid insurance expiry date.')).not.toBeInTheDocument();
+      });
+    });
   });
 
   describe('Debounced Server Validation', () => {
@@ -247,6 +297,44 @@ describe('DriverSignupPage Component', () => {
         expect(screen.getByText('License not found in server')).toBeInTheDocument();
         expect(screen.getByText('Plate not found')).toBeInTheDocument();
       });
+    });
+
+    it('blocks submission while server validation errors are still present', async () => {
+      vi.useFakeTimers();
+
+      vi.mocked(apiFetch).mockImplementation(async (url) => {
+        if (url.includes('validate')) {
+          return { field_errors: { vehicle_registration: 'Plate not found' } };
+        }
+        return {};
+      });
+
+      render(<DriverSignupPage {...mockProps} />);
+      fillValidForm();
+
+      const licenseInput = screen.getByLabelText(/Licence number/i);
+      const plateInput = screen.getByLabelText(/License plate/i);
+      fireEvent.blur(licenseInput);
+      fireEvent.blur(plateInput);
+
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+
+      vi.useRealTimers();
+
+      await waitFor(() => {
+        expect(screen.getByText('Plate not found')).toBeInTheDocument();
+      });
+
+      const form = screen.getByRole('button', { name: 'Submit driver application' }).closest('form')!;
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(screen.getByText('Please fix the highlighted fields.')).toBeInTheDocument();
+      });
+
+      expect(apiFetch).not.toHaveBeenCalledWith('drivers/upgrade', expect.anything());
     });
 
     it('clears server errors if the debounce validation fails (catch block)', async () => {

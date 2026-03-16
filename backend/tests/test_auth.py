@@ -221,6 +221,72 @@ class TestLogin:
         assert response.status_code == 503
         assert response.json()["detail"] == "Authentication service unavailable"
 
+    def test_login_rejects_response_without_user(self, client):
+        mock_response = MagicMock()
+        mock_response.user = None
+
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
+            mock_supabase.auth.sign_in_with_password.return_value = mock_response
+
+            response = client.post("/auth/login", json={
+                "identifier": "user@bath.ac.uk",
+                "password": "Password1!",
+            })
+
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid credentials"
+
+
+class TestRefresh:
+    def test_refresh_returns_new_tokens(self, client):
+        mock_session = MagicMock()
+        mock_session.access_token = "new-access-token"
+        mock_session.refresh_token = "new-refresh-token"
+
+        mock_response = MagicMock()
+        mock_response.session = mock_session
+
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
+            mock_supabase.auth.refresh_session.return_value = mock_response
+
+            response = client.post("/auth/refresh", json={"refresh_token": "refresh-token"})
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "access_token": "new-access-token",
+            "refresh_token": "new-refresh-token",
+            "token_type": "bearer",
+        }
+
+    def test_refresh_rejects_missing_session(self, client):
+        mock_response = MagicMock()
+        mock_response.session = None
+
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
+            mock_supabase.auth.refresh_session.return_value = mock_response
+
+            response = client.post("/auth/refresh", json={"refresh_token": "expired-token"})
+
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid or expired refresh token"
+
+    def test_refresh_rejects_refresh_errors(self, client):
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
+            mock_supabase.auth.refresh_session.side_effect = Exception("refresh failed")
+
+            response = client.post("/auth/refresh", json={"refresh_token": "expired-token"})
+
+        assert response.status_code == 401
+        assert response.json()["detail"] == "refresh failed"
+
 
 class TestLogout:
     def test_successful_logout(self, client):
@@ -240,3 +306,21 @@ class TestLogout:
 
         assert response.status_code == 200
         assert response.json()["message"] == "Successfully logged out"
+
+    def test_logout_returns_bad_request_when_sign_out_fails(self, client):
+        from app.accounts.dependencies import get_current_user
+        from main import app
+
+        fake_user = {"sub": "abc-123", "email": "user@bath.ac.uk"}
+        app.dependency_overrides[get_current_user] = lambda: fake_user
+
+        with patch("app.routers.auth.create_supabase_client") as mock_create_client:
+            mock_supabase = MagicMock()
+            mock_create_client.return_value = mock_supabase
+            mock_supabase.auth.sign_out.side_effect = Exception("logout failed")
+            response = client.post("/auth/logout")
+
+        app.dependency_overrides.clear()
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "logout failed"
