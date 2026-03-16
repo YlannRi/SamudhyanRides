@@ -11,17 +11,20 @@ origins = [
     "https://samudhyanrides.vercel.app",
     "http://localhost:3000",
     "http://localhost:5173",
-    "https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io"
+    "https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io",
 ]
 
-# Allow Vercel preview domains for PR/branch deployments.
-# Override via env var if you need to narrow this further.
-preview_origin_regex = os.getenv("CORS_ALLOW_ORIGIN_REGEX", r"^https://.*\.vercel\.app$")
+
+extra_origins_raw = os.getenv("CORS_EXTRA_ORIGINS", "")
+extra_origins = [origin.strip() for origin in extra_origins_raw.split(",") if origin.strip()]
+allowed_origins = [*origins, *extra_origins]
+
+vercel_preview_origin_regex = r"^https://samudhyanrides-[a-z0-9-]+-ylannris-projects\.vercel\.app$"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex=preview_origin_regex,
+    allow_origins=allowed_origins,
+    allow_origin_regex=vercel_preview_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
