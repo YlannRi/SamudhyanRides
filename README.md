@@ -102,10 +102,132 @@ The smoke suite checks:
 - the root route loads
 - the login route renders its form
 
+## Frontend E2E Tests
+
+The repo also includes a small Playwright end-to-end suite for stable user journeys against mocked API responses.
+
+From `frontend`, run:
+
+`npm run test:e2e`
+
+The first-pass E2E coverage includes:
+
+- logging in and logging out through the app shell
+- driver account sign-up routing into the driver application form
+- adding a trusted contact from Safety check-up
+
 ### GitHub Actions
 
 There is also a manual and reusable workflow at `.github/workflows/post-deploy-smoke.yml`.
 Use it after deployment, or call it from a future deployment workflow once deployment is automated in GitHub Actions.
+
+## Performance Testing
+
+The repo now includes a backend performance harness under `backend/perf/`.
+
+It records these metrics:
+
+- response time
+- throughput
+- concurrency
+- memory usage
+
+### Local setup
+
+Install the performance-only dependencies:
+
+`npm run perf:backend:install`
+
+### Run against a local Docker backend
+
+If your backend is running via `docker compose up`, the runner can sample memory from the `samudhyan_backend` container automatically:
+
+`npm run perf:backend -- --host http://127.0.0.1:8000 --users 20 --spawn-rate 5 --run-time 30s`
+
+### Run against a local Python process
+
+If you start the backend directly with Uvicorn, pass its PID so memory usage is sampled from the process instead of Docker:
+
+`python backend/perf/run_suite.py --host http://127.0.0.1:8000 --users 20 --spawn-rate 5 --run-time 30s --pid <backend-pid>`
+
+### Run a longer soak test
+
+To catch leaks or gradual degradation, run the matrix harness with a longer soak duration:
+
+`npm run perf:backend:soak`
+
+That runs:
+
+- a `15m` soak scenario
+- a `50` user stepped-load scenario
+- a `100` user stepped-load scenario
+
+If you want a shorter soak:
+
+`npm run perf:backend:matrix -- --soak-duration 5m --step-users 50,100`
+
+### Increase load gradually
+
+Use the matrix harness to ramp users and identify where latency or failures begin:
+
+`npm run perf:backend:matrix -- --step-users 50,100`
+
+You can change the ramp points as needed:
+
+`npm run perf:backend:matrix -- --step-users 25,50,75,100,125`
+
+### Ramp until failure threshold
+
+If you want the runner to keep increasing concurrency until failure rate exceeds a threshold, use:
+
+`npm run perf:backend:ramp`
+
+By default this runs:
+
+- start at `25` users
+- add `25` users per stage
+- cap at `200` users
+- run each stage for `2m`
+- stop when failure rate exceeds `1%`
+
+You can override any of that:
+
+`python backend/perf/run_ramp.py --start-users 50 --step-users 50 --max-users 300 --run-time 5m --failure-rate-threshold-pct 2`
+
+### Output
+
+The suite writes artifacts to `backend/perf/results/`:
+
+- `backend_perf_summary.json`
+- `backend_perf_summary.md`
+- `backend_perf.html`
+- Locust CSV stats/history files
+- stdout/stderr logs
+
+The matrix runner also writes:
+
+- `backend_perf_matrix_summary.json`
+- `backend_perf_matrix_summary.md`
+
+These aggregate the soak and stepped-load scenarios and highlight the first scenario where failures appear or p95 latency doubles relative to the baseline.
+
+The ramp runner writes:
+
+- `backend_perf_ramp_summary.json`
+- `backend_perf_ramp_summary.md`
+
+These show every stage that ran and the first user level where failure rate crossed the configured threshold.
+
+### Thresholds
+
+You can turn the suite into a gate by passing optional thresholds:
+
+`python backend/perf/run_suite.py --max-p95-ms 500 --min-rps 25 --max-failure-rate-pct 1 --max-peak-memory-mb 300`
+
+### GitHub Actions
+
+There is also a manual workflow at `.github/workflows/performance.yml`.
+It starts the backend on GitHub Actions, runs the performance suite, and uploads the generated reports as artifacts.
 
 ## Deploy Pipeline
 

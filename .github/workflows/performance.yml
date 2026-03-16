@@ -1,0 +1,71 @@
+name: Performance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-performance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-perf.txt
+
+      - name: Install backend and performance dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt -r backend/requirements-perf.txt
+
+      - name: Set performance test environment variables
+        run: |
+          echo "SUPABASE_URL=https://example.supabase.co" >> "$GITHUB_ENV"
+          echo "SUPABASE_KEY=dummy-test-key" >> "$GITHUB_ENV"
+
+      - name: Start backend
+        working-directory: backend
+        run: |
+          nohup python -m uvicorn main:app --host 127.0.0.1 --port 8000 > ../backend-performance.log 2>&1 &
+          echo $! > ../backend-performance.pid
+
+      - name: Wait for health endpoint
+        run: |
+          for i in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:8000/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Backend did not become healthy in time" >&2
+          exit 1
+
+      - name: Run performance suite
+        run: |
+          python backend/perf/run_suite.py \
+            --host http://127.0.0.1:8000 \
+            --users 20 \
+            --spawn-rate 5 \
+            --run-time 30s \
+            --pid "$(cat backend-performance.pid)"
+
+      - name: Upload performance artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-performance
+          path: |
+            backend/perf/results
+            backend-performance.log
+            backend-performance.pid
+          if-no-files-found: error

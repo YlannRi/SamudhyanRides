@@ -19,6 +19,7 @@ const MOCK_USER = {
   phone: '07123456789',
   email: 'test@example.com',
   middle_names: '',
+  trusted_contacts: [],
 };
 
 const MOCK_RIDE = {
@@ -91,10 +92,20 @@ export async function installApiMocks(page: Page) {
     if (url.match(/\/auth\/register$/) && method === 'POST') {
       return json(route, 200, { message: 'Account created' });
     }
+    if (url.match(/\/auth\/logout$/) && method === 'POST') {
+      return json(route, 200, { message: 'Logged out' });
+    }
 
     // ── Users ──
     if (url.match(/\/users\/me$/) && method === 'GET') {
       return json(route, 200, MOCK_USER);
+    }
+    if (url.match(/\/users\/me\/preferences$/) && method === 'PUT') {
+      const body = req.postDataJSON?.() ?? {};
+      return json(route, 200, {
+        ...MOCK_USER,
+        trusted_contacts: body.trusted_contacts ?? [],
+      });
     }
 
     // ── Drivers ──
@@ -110,6 +121,12 @@ export async function installApiMocks(page: Page) {
         vehicle_registration: 'AB12 CDE',
         license_number: 'DRIVE123',
       });
+    }
+    if (url.match(/\/drivers\/validate$/) && method === 'POST') {
+      return json(route, 200, { valid: true, field_errors: {} });
+    }
+    if (url.match(/\/drivers\/upgrade$/) && method === 'POST') {
+      return json(route, 200, { status: 'pending' });
     }
 
     // ── Rides ──
@@ -149,6 +166,18 @@ export async function installApiMocks(page: Page) {
     }
 
     // ── Notifications ──
+    if (url.match(/\/notifications\/unread-count$/) && method === 'GET') {
+      return json(route, 200, { unread_count: 1 });
+    }
+    if (url.match(/\/notifications\/read-all$/) && method === 'PUT') {
+      return json(route, 200, { success: true });
+    }
+    if (url.match(/\/notifications\/read-by-link/) && method === 'PUT') {
+      return json(route, 200, { success: true });
+    }
+    if (url.match(/\/notifications\/?$/) && method === 'GET') {
+      return json(route, 200, [MOCK_NOTIFICATION]);
+    }
     if (url.match(/\/notification/) && method === 'GET') {
       return json(route, 200, [MOCK_NOTIFICATION]);
     }
@@ -188,6 +217,7 @@ export async function installApiMocks(page: Page) {
       url.includes('/rides/') ||
       url.includes('/bookings/') ||
       url.includes('/ratings/') ||
+      url.includes('/notifications/') ||
       url.includes('/notification') ||
       url.includes('/incidents') ||
       url.includes('/timetable') ||

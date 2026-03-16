@@ -37,6 +37,7 @@ build/
 .coverage
 htmlcov/
 coverage/
+backend/perf/results/
 
 # Misc
 *.log

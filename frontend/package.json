@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:a11y": "playwright test",
+    "test:a11y": "playwright test tests/a11y.spec.ts tests/a11y.routes.spec.ts",
+    "test:e2e": "playwright test tests/e2e.spec.ts",
     "test:smoke": "playwright test tests/smoke.spec.ts"
   },
   "dependencies": {
