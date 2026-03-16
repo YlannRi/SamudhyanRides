@@ -12,7 +12,6 @@ origins = [
     "http://localhost:3000",
     "http://localhost:5173",
     "https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io",
-    "https://samudhyanrides-git-feat-test-before-prod-ylannris-projects.vercel.app",
 ]
 
 
@@ -20,7 +19,8 @@ extra_origins_raw = os.getenv("CORS_EXTRA_ORIGINS", "")
 extra_origins = [origin.strip() for origin in extra_origins_raw.split(",") if origin.strip()]
 allowed_origins = [*origins, *extra_origins]
 
-vercel_preview_origin_regex = r"^https://samudhyanrides-[a-z0-9-]+-ylannris-projects\.vercel\.app$"
+# Allow all Vercel deployments for this project family, including preview and branch URLs.
+vercel_preview_origin_regex = r"^https://samudhyanrides-[a-z0-9-]+\.vercel\.app$"
 
 app.add_middleware(
     CORSMiddleware,
