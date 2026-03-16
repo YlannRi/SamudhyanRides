@@ -15,7 +15,57 @@ exception
 end;
 $$;
 
-select plan(14);
+select plan(18);
+
+insert into auth.users (id, email)
+values
+  ('10000000-0000-0000-0000-000000000101', 'driver@example.com'),
+  ('10000000-0000-0000-0000-000000000102', 'passenger@example.com');
+
+insert into public.user_profiles (
+  id,
+  auth_user_id,
+  first_name,
+  last_name,
+  email,
+  university_username
+)
+values
+  (
+    '10000000-0000-0000-0000-000000000601',
+    '10000000-0000-0000-0000-000000000101',
+    'Driver',
+    'Chat',
+    'driver@example.com',
+    'driverchat'
+  ),
+  (
+    '10000000-0000-0000-0000-000000000501',
+    '10000000-0000-0000-0000-000000000102',
+    'Passenger',
+    'Chat',
+    'passenger@example.com',
+    'passengerchat'
+  );
+
+insert into public.rides (
+  id,
+  driver_id,
+  origin,
+  destination,
+  departure_time,
+  seats_total,
+  seats_available
+)
+values (
+  '10000000-0000-0000-0000-000000000401',
+  '10000000-0000-0000-0000-000000000601',
+  'Bath',
+  'Bristol',
+  '2026-03-16T10:00:00Z',
+  2,
+  1
+);
 
 insert into public.ride_chats (id, ride_id, passenger_id)
 values (
@@ -112,8 +162,30 @@ select ok(
   'notifications user index exists'
 );
 
+select ok((select relrowsecurity from pg_class where oid = 'public.ride_chats'::regclass), 'ride_chats has RLS enabled');
+select ok((select relrowsecurity from pg_class where oid = 'public.ride_messages'::regclass), 'ride_messages has RLS enabled');
 select ok((select relrowsecurity from pg_class where oid = 'public.notifications'::regclass), 'notifications has RLS enabled');
 
+select is(
+  (
+    select string_agg(policyname::text, '|' order by policyname::text)
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'ride_chats'
+  ),
+  'Ride participants can create chats|Ride participants can view chats',
+  'ride_chats policies are present'
+);
+select is(
+  (
+    select string_agg(policyname::text, '|' order by policyname::text)
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'ride_messages'
+  ),
+  'Ride participants can create messages|Ride participants can view messages',
+  'ride_messages policies are present'
+);
 select is(
   (
     select string_agg(policyname::text, '|' order by policyname::text)

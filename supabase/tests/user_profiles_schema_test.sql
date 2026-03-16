@@ -15,7 +15,7 @@ exception
 end;
 $$;
 
-select plan(17);
+select plan(21);
 
 insert into auth.users (id, email)
 values
@@ -78,6 +78,16 @@ select is(
   'rating defaults to 0.0'
 );
 select is(
+  (select driver_rating::text from public.user_profiles where auth_user_id = '00000000-0000-0000-0000-000000000101'),
+  '0.0',
+  'driver_rating defaults to 0.0'
+);
+select is(
+  (select rider_rating::text from public.user_profiles where auth_user_id = '00000000-0000-0000-0000-000000000101'),
+  '0.0',
+  'rider_rating defaults to 0.0'
+);
+select is(
   (select is_active::text from public.user_profiles where auth_user_id = '00000000-0000-0000-0000-000000000101'),
   'true',
   'is_active defaults to true'
@@ -117,6 +127,22 @@ select is(
   $$),
   '23514',
   'rating check constraint rejects invalid values'
+);
+select is(
+  public.test_capture_sqlstate($$
+    insert into public.user_profiles (auth_user_id, first_name, last_name, email, university_username, driver_rating)
+    values ('00000000-0000-0000-0000-000000000102', 'Beta', 'Tester', 'beta@example.com', 'beta01', 6.0)
+  $$),
+  '23514',
+  'driver_rating check constraint rejects invalid values'
+);
+select is(
+  public.test_capture_sqlstate($$
+    insert into public.user_profiles (auth_user_id, first_name, last_name, email, university_username, rider_rating)
+    values ('00000000-0000-0000-0000-000000000102', 'Beta', 'Tester', 'beta@example.com', 'beta01', 6.0)
+  $$),
+  '23514',
+  'rider_rating check constraint rejects invalid values'
 );
 
 select is(
