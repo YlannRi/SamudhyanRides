@@ -1,0 +1,20 @@
+name: Frontend Production Smoke
+
+on:
+  repository_dispatch:
+    types: ['vercel.deployment.success']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-production-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    if: ${{ github.event.client_payload.environment == 'production' }}
+    uses: ./.github/workflows/post-deploy-smoke.yml
+    with:
+      frontend_url: ${{ startsWith(github.event.client_payload.url, 'http') && github.event.client_payload.url || format('https://{0}', github.event.client_payload.url) }}
+      backend_url: ${{ vars.PRODUCTION_BACKEND_URL || 'https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io' }}

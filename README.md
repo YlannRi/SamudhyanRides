@@ -78,3 +78,60 @@ The local schema lives in `supabase/migrations/` and currently mirrors `database
 ### 5ï¸âƒ£ Run pgTAP
 
 `npm run db:test`
+
+## Smoke Tests
+
+Use the smoke layer after deployment to verify that the live system is still reachable.
+
+### Backend
+
+Set `SMOKE_BACKEND_URL` to the deployed backend origin and run:
+
+`npm run smoke:backend`
+
+This checks `GET /health` and expects a JSON response with `"status": "ready"`.
+
+### Frontend
+
+From `frontend`, point Playwright at the deployed frontend and run:
+
+`$env:PW_BASE_URL="https://samudhyanrides.vercel.app"; npm run test:smoke`
+
+The smoke suite checks:
+
+- the root route loads
+- the login route renders its form
+
+### GitHub Actions
+
+There is also a manual and reusable workflow at `.github/workflows/post-deploy-smoke.yml`.
+Use it after deployment, or call it from a future deployment workflow once deployment is automated in GitHub Actions.
+
+## Deploy Pipeline
+
+Backend deployment is now wired through GitHub Actions in `.github/workflows/deploy-backend.yml`.
+
+- On pushes to `main`, it waits for the `CI` workflow to finish successfully, then deploys `backend/` to Azure Container Apps.
+- It runs the smoke workflow immediately after deployment.
+- You can also trigger it manually with `workflow_dispatch`.
+
+Frontend production smoke is wired to Vercel's real deployment pipeline in `.github/workflows/frontend-production-smoke.yml`.
+
+- It listens for Vercel `repository_dispatch` events of type `vercel.deployment.success`.
+- It only runs smoke tests when Vercel reports the deployment environment as `production`.
+
+### GitHub configuration
+
+Set these GitHub repository or environment variables for the backend deploy workflow:
+
+- `AZURE_ACR_NAME`
+- `AZURE_CONTAINER_APP_NAME`
+- `AZURE_RESOURCE_GROUP`
+- `PRODUCTION_FRONTEND_URL` (optional if you keep `https://samudhyanrides.vercel.app`)
+- `PRODUCTION_BACKEND_URL` (optional if you keep `https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io`)
+
+Set this GitHub secret for backend deployment:
+
+- `AZURE_CREDENTIALS`
+
+For the Vercel-triggered smoke workflow, make sure the Vercel project is connected to this GitHub repository so `repository_dispatch` deployment events are delivered to GitHub Actions.
