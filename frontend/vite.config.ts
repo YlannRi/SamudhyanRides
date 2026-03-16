@@ -25,6 +25,12 @@ export default defineConfig({
         'node_modules/**',
         'dist/**'
       ],
+      thresholds: {
+        statements: 90,
+        branches: 80,
+        functions: 90,
+        lines: 95,
+      },
     },
     globals: true,
     setupFiles: './src/setupTests.ts',
