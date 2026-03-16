@@ -31,7 +31,7 @@ describe('useGeocode', () => {
     vi.mocked(apiFetch).mockReturnValueOnce(
       new Promise((resolve) => {
         resolveRequest = resolve;
-      }) as Promise<never>,
+      }),
     );
 
     const { result } = renderHook(() => useGeocode());

@@ -66,7 +66,7 @@ it('parses successful json responses and omits auth headers when auth is disable
     ok: true,
     status: 200,
     text: vi.fn().mockResolvedValue('{"ok":true}'),
-  } as Response);
+  } as unknown as Response);
 
   await expect(
     apiFetch('users/me', {
@@ -94,7 +94,7 @@ it('returns null for empty successful responses', async () => {
     ok: true,
     status: 204,
     text: vi.fn().mockResolvedValue(''),
-  } as Response);
+  } as unknown as Response);
 
   await expect(apiFetch('notifications/read-all', { method: 'PUT' })).resolves.toBeNull();
 });
@@ -130,7 +130,7 @@ it('refreshes the token and retries the request after a 401', async () => {
       ok: true,
       status: 200,
       text: vi.fn().mockResolvedValue('{"retried":true}'),
-    } as Response);
+    } as unknown as Response);
 
   await expect(apiFetch('users/me')).resolves.toEqual({ retried: true });
 
