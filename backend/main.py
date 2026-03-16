@@ -12,7 +12,7 @@ origins = [
     "http://localhost:3000",
     "http://localhost:5173",
     "https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io",
-    "https://samudhyanrides-git-feat-test-before-prod-ylannris-projects.vercel.app/",
+    "https://samudhyanrides-git-feat-test-before-prod-ylannris-projects.vercel.app",
 ]
 
 
