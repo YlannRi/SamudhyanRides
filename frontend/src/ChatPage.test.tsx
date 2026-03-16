@@ -47,8 +47,11 @@ describe('ChatPage Component', () => {
     global.WebSocket = class {
       static OPEN = 1;
       static CLOSED = 3;
+      url: string;
 
-      constructor(public url: string) {}
+      constructor(url: string) {
+        this.url = url;
+      }
 
       send(data: any) { mockWsInstance.send(data); }
       close() { mockWsInstance.close(); }

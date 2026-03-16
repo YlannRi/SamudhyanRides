@@ -48,6 +48,7 @@ describe('InboxPage Component', () => {
     const mockNotifications = [
       {
         id: '1',
+        user_id: 'user-1',
         type: 'chat',
         title: 'New message from Alice',
         body: 'Are we still on for 5?',
@@ -57,6 +58,7 @@ describe('InboxPage Component', () => {
       },
       {
         id: '2',
+        user_id: 'user-1',
         type: 'ride',
         title: 'Ride Confirmed',
         body: 'Your ride to campus is confirmed.',
@@ -81,8 +83,10 @@ describe('InboxPage Component', () => {
     const mockNotifications = [
       {
         id: '1',
+        user_id: 'user-1',
         type: 'chat',
         title: 'New message from Alice',
+        body: 'Are we still on for 5?',
         created_at: new Date().toISOString(),
         read: false,
         link: '/chat/123'

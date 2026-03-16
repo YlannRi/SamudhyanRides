@@ -252,12 +252,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const unsubscribe = subscribeToIncomingNotifications((notification) => {
-      if (notification.type !== 'chat' || !notification.link) {
+      const notificationLink = notification.link;
+      if (notification.type !== 'chat' || !notificationLink) {
         return;
       }
 
-      if (activeChatLink && areSameChatLink(notification.link, activeChatLink)) {
-        void markReadByLink(notification.link);
+      if (activeChatLink && areSameChatLink(notificationLink, activeChatLink)) {
+        void markReadByLink(notificationLink);
         return;
       }
 
@@ -271,7 +272,7 @@ const App: React.FC = () => {
             id: notification.id,
             senderName: getChatToastSenderName(notification.title),
             preview: notification.body,
-            link: notification.link,
+            link: notificationLink,
           },
           ...prev,
         ];
