@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { apiFetch, buildWebSocketUrl } from './lib/api';
 import { getAuthToken } from './lib/authToken';
+import { buildChatPath } from './lib/chatRoutes';
 import { Icons } from './App';
 
 type ChatMessage = {
@@ -26,7 +27,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ rideId, participantId, onBack }) =>
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const chatQuery = participantId ? `?participant_id=${encodeURIComponent(participantId)}` : '';
-  const chatLink = participantId ? `/chat/${rideId}?participant=${encodeURIComponent(participantId)}` : `/chat/${rideId}`;
+  const chatLink = buildChatPath(rideId, participantId);
 
   // Resolve current user's profile_id
   useEffect(() => {

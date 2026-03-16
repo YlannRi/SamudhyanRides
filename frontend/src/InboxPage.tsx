@@ -3,7 +3,9 @@ import { Icons } from './App';
 import {
   type Notification,
   fetchNotifications,
+  getNotifications,
   markReadByLink,
+  subscribe,
 } from './lib/notifications';
 
 const inboxMetaText = 'var(--text-muted)';
@@ -19,12 +21,33 @@ const InboxPage: React.FC<InboxPageProps> = ({ onBack, onNavigate }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
+    setNotifications(getNotifications());
+
+    const unsubscribe = subscribe(() => {
+      if (isMounted) {
+        setNotifications(getNotifications());
+      }
+    });
+
     (async () => {
       setLoading(true);
-      const data = await fetchNotifications();
-      setNotifications(data);
-      setLoading(false);
+      try {
+        const data = await fetchNotifications();
+        if (!isMounted) return;
+        setNotifications(data);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
     })();
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const handleNotificationClick = async (notification: Notification) => {

@@ -208,6 +208,72 @@ body {
   z-index: 20;
 }
 
+.chat-toast-layer {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 448px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 32;
+  pointer-events: none;
+}
+
+.chat-toast-card {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(6, 24, 48, 0.96);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(16px);
+  animation: chat-toast-enter 0.2s ease-out;
+}
+
+.chat-toast-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-gold-strong);
+}
+
+.chat-toast-sender {
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.chat-toast-preview {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes chat-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .bottom-nav::before {
   content: none;
 }
@@ -380,7 +446,7 @@ body {
 .top-toggle {
   margin-top: 12px;
   display: inline-flex;
-  background: var(--bg-surface);
+  background: #143f67;
   border-radius: 999px;
   padding: 2px;
 }
@@ -388,7 +454,7 @@ body {
 .toggle-tab {
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: #f6f9ff;
   font-size: 13px;
   padding: 6px 14px;
   border-radius: 999px;
@@ -397,8 +463,8 @@ body {
 }
 
 .toggle-tab-active {
-  background: var(--color-gold);
-  color: var(--bg-main);
+  background: #f0cf7a;
+  color: #102741;
 }
 /* Auth / login page */
 .auth-checkbox-row {

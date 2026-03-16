@@ -11,31 +11,32 @@ import JourneyPage from './JourneyPage';
 import SettingsPage from './SettingsPage';
 import ChatPage from './ChatPage';
 import InboxPage from './InboxPage';
+import ChatToastLayer, { type ChatToast } from './ChatToastLayer';
 import { apiFetch } from './lib/api';
 import TimetablePage, { type RidePrefill } from './TimetablePage';
 import SafetyCheckupPage from './SafetyCheckupPage.tsx';
 import { getAuthToken, clearAuthToken } from './lib/authToken';
-import { getUnreadCount, subscribe, startPolling, stopPolling } from './lib/notifications';
+import {
+  getUnreadCount,
+  markReadByLink,
+  resetNotifications,
+  startPolling,
+  startRealtimeNotifications,
+  subscribe,
+  subscribeToIncomingNotifications,
+} from './lib/notifications';
+import { areSameChatLink, buildChatPath, parseChatLink } from './lib/chatRoutes';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 
 type Tab = 'home' | 'journey' | 'activity' | 'account' | 'settings' | 'request' | 'post' | 'timetable' | 'safety' | 'chat' | 'inbox';
+const CHAT_TITLE_PREFIX = 'New message from ';
 
-const buildChatPath = (rideId: string, participantId?: string) => {
-  if (!participantId) return `/chat/${rideId}`;
-  return `/chat/${rideId}?participant=${encodeURIComponent(participantId)}`;
-};
+const getChatToastSenderName = (title: string) => {
+  if (title.startsWith(CHAT_TITLE_PREFIX)) {
+    return title.slice(CHAT_TITLE_PREFIX.length).trim();
+  }
 
-const parseChatLink = (link: string) => {
-  const url = new URL(link, window.location.origin);
-  if (!url.pathname.startsWith('/chat/')) return null;
-
-  const rideId = url.pathname.replace('/chat/', '').split('/')[0];
-  if (!rideId) return null;
-
-  return {
-    rideId,
-    participantId: url.searchParams.get('participant') ?? undefined,
-  };
+  return title;
 };
 
 const applyRouteMode = (
@@ -240,12 +241,51 @@ const App: React.FC = () => {
   const [chatParticipantId, setChatParticipantId] = useState<string | undefined>(undefined);
   const [chatReturnTab, setChatReturnTab] = useState<Tab>('activity');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [chatToasts, setChatToasts] = useState<ChatToast[]>([]);
+  const activeChatLink = activeTab === 'chat' && chatRideId ? buildChatPath(chatRideId, chatParticipantId) : null;
 
   // Subscribe to notification store updates
   useEffect(() => {
     const unsub = subscribe(() => setUnreadCount(getUnreadCount()));
     return unsub;
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToIncomingNotifications((notification) => {
+      if (notification.type !== 'chat' || !notification.link) {
+        return;
+      }
+
+      if (activeChatLink && areSameChatLink(notification.link, activeChatLink)) {
+        void markReadByLink(notification.link);
+        return;
+      }
+
+      setChatToasts((prev) => {
+        if (prev.some((toast) => toast.id === notification.id)) {
+          return prev;
+        }
+
+        return [
+          {
+            id: notification.id,
+            senderName: getChatToastSenderName(notification.title),
+            preview: notification.body,
+            link: notification.link,
+          },
+          ...prev,
+        ];
+      });
+    });
+
+    return unsubscribe;
+  }, [activeChatLink]);
+
+  useEffect(() => {
+    if (!activeChatLink) return;
+
+    setChatToasts((prev) => prev.filter((toast) => !areSameChatLink(toast.link, activeChatLink)));
+  }, [activeChatLink]);
 
   const navigate = (tab: Tab) => {
     const nextPath = tabToPath(tab);
@@ -286,6 +326,9 @@ const App: React.FC = () => {
       if (chatRoute) {
         setChatRideId(chatRoute.rideId);
         setChatParticipantId(chatRoute.participantId);
+      } else {
+        setChatRideId(null);
+        setChatParticipantId(undefined);
       }
       applyRouteMode(currentUrl, setActivityMode, setJourneyMode);
       setActiveTab(pathToTab(window.location.pathname));
@@ -315,7 +358,7 @@ const App: React.FC = () => {
     }
   };
   useEffect(() => {
-  const token = getAuthToken();
+    const token = getAuthToken();
     if (!token) return;
     setIsAuthenticated(true);
 
@@ -324,9 +367,11 @@ const App: React.FC = () => {
         await apiFetch('users/me', { method: 'GET' });
         await refreshDriverStatus();
         startPolling();
+        startRealtimeNotifications(token);
       } catch (e: any) {
         if (e?.status === 401) {
           clearAuthToken();
+          resetNotifications();
           setIsAuthenticated(false);
           setCanUseDriverMode(false);
         }
@@ -338,14 +383,31 @@ const App: React.FC = () => {
     setIsAuthenticated(true);
     await refreshDriverStatus();
     startPolling();
+    const token = getAuthToken();
+    if (token) {
+      startRealtimeNotifications(token);
+    }
   };
 
   const handleLogout = () => {
     clearAuthToken();
-    stopPolling();
+    resetNotifications();
     setIsAuthenticated(false); // Reset auth state
     navigate('home'); // Reset tab so it defaults to home on next login
     setShowDriverSignup(false);
+    setChatToasts([]);
+    setChatRideId(null);
+    setChatParticipantId(undefined);
+  };
+
+  const dismissToast = (toastId: string) => {
+    setChatToasts((prev) => prev.filter((toast) => toast.id !== toastId));
+  };
+
+  const openToast = (toast: ChatToast) => {
+    dismissToast(toast.id);
+    void markReadByLink(toast.link);
+    navigateFromLink(toast.link);
   };
 
   const startDriverSignup = (destination: Tab = 'home') => {
@@ -522,6 +584,10 @@ const App: React.FC = () => {
           />
         )}
       </main>
+
+      {isAuthenticated && (
+        <ChatToastLayer toasts={chatToasts} onOpen={openToast} onDismiss={dismissToast} />
+      )}
 
       {isAuthenticated && (
         <nav className="bottom-nav" aria-label="Primary">

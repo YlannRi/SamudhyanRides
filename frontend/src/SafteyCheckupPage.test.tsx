@@ -61,7 +61,7 @@ describe('SafetyCheckupPage Component', () => {
 
     fireEvent.click(screen.getByText('RideCheck'));
 
-    expect(screen.getByText('What’s a RideCheck?')).toBeInTheDocument();
+    expect(screen.getByText("What's a RideCheck?")).toBeInTheDocument();
 
     const toggle = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
     expect(toggle).not.toBeNull();

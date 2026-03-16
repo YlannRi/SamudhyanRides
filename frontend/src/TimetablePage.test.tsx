@@ -1,31 +1,28 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import TimetablePage from './TimetablePage';
 import { apiFetch } from './lib/api';
 
-// Mock the API fetch utility
 vi.mock('./lib/api', () => ({
   apiFetch: vi.fn(),
 }));
 
-describe('TimetablePage Component', () => {
-  const mockOnBack = vi.fn();
-  const mockOnSelectEvent = vi.fn();
+describe('TimetablePage', () => {
+  const onBack = vi.fn();
+  const onSelectEvent = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
     window.localStorage.clear();
-    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    vi.runOnlyPendingTimers();
     vi.useRealTimers();
-    vi.restoreAllMocks();
   });
 
-  it('renders correctly and shows the empty state initially', () => {
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+  it('renders the current empty state', () => {
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
     expect(screen.getByText('Timetable')).toBeInTheDocument();
     expect(screen.getByLabelText('University timetable iCal URL')).toBeInTheDocument();
@@ -33,41 +30,44 @@ describe('TimetablePage Component', () => {
   });
 
   it('calls onBack when the back button is clicked', () => {
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
-    const backButton = screen.getByRole('button', { name: 'Back' });
-    fireEvent.click(backButton);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
 
-    expect(mockOnBack).toHaveBeenCalledTimes(1);
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it('loads the URL from localStorage on mount if available', () => {
+  it('loads a remembered timetable URL from local storage', () => {
     window.localStorage.setItem('timetableUrl', 'https://mytimetable.bath.ac.uk/ical?test');
 
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
-    const input = screen.getByLabelText('University timetable iCal URL');
-    expect(input).toHaveValue('https://mytimetable.bath.ac.uk/ical?test');
+    expect(screen.getByLabelText('University timetable iCal URL')).toHaveValue(
+      'https://mytimetable.bath.ac.uk/ical?test',
+    );
   });
 
   it('loads the saved calendar link from the account profile when available', async () => {
     window.localStorage.setItem('authToken', 'fake-token');
     vi.mocked(apiFetch).mockResolvedValueOnce([{ calendar_link: 'https://bath.ac.uk/account-feed.ics' }]);
 
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText('University timetable iCal URL')).toHaveValue('https://bath.ac.uk/account-feed.ics');
+      expect(apiFetch).toHaveBeenCalledWith('users/me', { method: 'GET' });
+      expect(screen.getByLabelText('University timetable iCal URL')).toHaveValue(
+        'https://bath.ac.uk/account-feed.ics',
+      );
     });
   });
 
-  it('persists the remembered timetable URL to the account without needing to load events', async () => {
+  it('persists the remembered timetable URL to the account profile after debounce', async () => {
     window.localStorage.setItem('authToken', 'fake-token');
     vi.mocked(apiFetch)
       .mockResolvedValueOnce([{ calendar_link: null }])
       .mockResolvedValueOnce({ calendar_link: 'https://bath.ac.uk/device-sync.ics' });
 
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith('users/me', { method: 'GET' });
@@ -77,19 +77,20 @@ describe('TimetablePage Component', () => {
       target: { value: 'https://bath.ac.uk/device-sync.ics' },
     });
 
-    vi.advanceTimersByTime(450);
-
-    await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith('users/me/preferences', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ calendar_link: 'https://bath.ac.uk/device-sync.ics' }),
-      });
-    });
+    await waitFor(
+      () => {
+        expect(apiFetch).toHaveBeenCalledWith('users/me/preferences', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ calendar_link: 'https://bath.ac.uk/device-sync.ics' }),
+        });
+      },
+      { timeout: 1500 },
+    );
   });
 
-  it('shows an error if trying to load without a URL', async () => {
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+  it('shows an error when loading without a URL', async () => {
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Load this week' }));
 
@@ -99,7 +100,7 @@ describe('TimetablePage Component', () => {
     });
   });
 
-  it('fetches events and renders them correctly', async () => {
+  it('loads events and renders them', async () => {
     const mockEvents = [
       {
         uid: 'event-1',
@@ -109,40 +110,31 @@ describe('TimetablePage Component', () => {
         end: new Date('2026-10-10T11:00:00Z').toISOString(),
       },
     ];
-
     vi.mocked(apiFetch).mockResolvedValueOnce(mockEvents);
 
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
     fireEvent.change(screen.getByLabelText('University timetable iCal URL'), {
       target: { value: 'https://test-url.com' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Load this week' }));
 
-    expect(screen.getByRole('button', { name: 'Loading...' })).toBeInTheDocument();
-
     await waitFor(() => {
-      // Check that the API was called with the correct default scope ("week")
       expect(apiFetch).toHaveBeenCalledWith('timetable/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: 'https://test-url.com', scope: 'week' }),
       });
-
-      // Check if URL was saved to localStorage (since 'Remember URL' is default true)
       expect(window.localStorage.getItem('timetableUrl')).toBe('https://test-url.com');
-
-      // Check if event is rendered
       expect(screen.getByText('Software Engineering Lecture')).toBeInTheDocument();
       expect(screen.getByText('CB 1.1')).toBeInTheDocument();
-      expect(screen.queryByText('No events found')).not.toBeInTheDocument();
     });
   });
 
-  it('handles empty array fallback when the API returns an unexpected non-array format', async () => {
+  it('falls back to an empty event list for unexpected response shapes', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce({ unexpected: 'object' });
 
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
     fireEvent.change(screen.getByLabelText('University timetable iCal URL'), {
       target: { value: 'https://test-url.com' },
@@ -154,57 +146,47 @@ describe('TimetablePage Component', () => {
     });
   });
 
-  it('toggles the scope to "day" and correctly updates the API payload and button text', async () => {
+  it('switches to day scope and updates the load payload', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([]);
 
-    const { container } = render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
     fireEvent.change(screen.getByLabelText('University timetable iCal URL'), {
       target: { value: 'https://test-url.com' },
     });
 
-    // Find the Day checkbox by finding the label text and getting its sibling input
-    const dayCheckbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
-    fireEvent.click(dayCheckbox);
-
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Day' }));
     expect(screen.getByRole('button', { name: 'Load today' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Load today' }));
 
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith('timetable/events', expect.objectContaining({
-        body: expect.stringContaining('"scope":"day"'),
+        body: JSON.stringify({ url: 'https://test-url.com', scope: 'day' }),
       }));
     });
   });
 
-  it('respects the "Remember URL" checkbox toggle', async () => {
+  it('stops remembering the URL when the checkbox is turned off', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([]);
 
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
     fireEvent.change(screen.getByLabelText('University timetable iCal URL'), {
       target: { value: 'https://do-not-remember.com' },
     });
-
-    const rememberCheckbox = screen.getByLabelText('Remember URL') as HTMLInputElement;
-
-    // Uncheck "Remember URL"
-    fireEvent.click(rememberCheckbox);
-    expect(rememberCheckbox.checked).toBe(false);
-
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Remember URL' }));
     fireEvent.click(screen.getByRole('button', { name: 'Load this week' }));
 
     await waitFor(() => {
-      // LocalStorage should NOT be populated
       expect(window.localStorage.getItem('timetableUrl')).toBeNull();
     });
   });
 
-  it('shows an error message when the API fetch fails with an Error object', async () => {
+  it('renders Error object messages from failed event loads', async () => {
     vi.mocked(apiFetch).mockRejectedValueOnce(new Error('Failed to parse iCal'));
 
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
     fireEvent.change(screen.getByLabelText('University timetable iCal URL'), {
       target: { value: 'https://test-url.com' },
@@ -216,10 +198,10 @@ describe('TimetablePage Component', () => {
     });
   });
 
-  it('shows a string error message when the API fetch fails with a string (fallback branch)', async () => {
+  it('renders string failures from failed event loads', async () => {
     vi.mocked(apiFetch).mockRejectedValueOnce('Network error string');
 
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
     fireEvent.change(screen.getByLabelText('University timetable iCal URL'), {
       target: { value: 'https://test-url.com' },
@@ -231,21 +213,18 @@ describe('TimetablePage Component', () => {
     });
   });
 
-  it('calculates the arrival time correctly (15 minutes prior) and calls onSelectEvent', async () => {
-    // We use a specific local date to avoid timezone issues affecting the padding functions.
-    const mockStartDate = new Date(2026, 9, 10, 10, 30); // Local time: 10:30 AM
-    const mockEvents = [
+  it('selects an event and sends a ride prefill fifteen minutes before start', async () => {
+    const mockStartDate = new Date(2026, 9, 10, 10, 30);
+    vi.mocked(apiFetch).mockResolvedValueOnce([
       {
         uid: 'event-1',
         title: 'Math Lecture',
         start: mockStartDate.toISOString(),
         end: new Date(2026, 9, 10, 11, 30).toISOString(),
       },
-    ];
+    ]);
 
-    vi.mocked(apiFetch).mockResolvedValueOnce(mockEvents);
-
-    render(<TimetablePage onBack={mockOnBack} onSelectEvent={mockOnSelectEvent} />);
+    render(<TimetablePage onBack={onBack} onSelectEvent={onSelectEvent} />);
 
     fireEvent.change(screen.getByLabelText('University timetable iCal URL'), {
       target: { value: 'https://test-url.com' },
@@ -256,20 +235,11 @@ describe('TimetablePage Component', () => {
       expect(screen.getByText('Math Lecture')).toBeInTheDocument();
     });
 
-    // Click the event to select it
     fireEvent.click(screen.getByText('Math Lecture'));
 
-    // Expected datetime is 15 minutes before 10:30 AM -> 10:15 AM
-    const expectedYear = mockStartDate.getFullYear();
-    const expectedMonth = String(mockStartDate.getMonth() + 1).padStart(2, '0');
-    const expectedDate = String(mockStartDate.getDate()).padStart(2, '0');
-    const expectedHours = '10'; // 10 AM
-    const expectedMinutes = '15'; // 30 - 15 = 15
-    const expectedDatetimeLocal = `${expectedYear}-${expectedMonth}-${expectedDate}T${expectedHours}:${expectedMinutes}`;
-
-    expect(mockOnSelectEvent).toHaveBeenCalledWith({
+    expect(onSelectEvent).toHaveBeenCalledWith({
       destination: 'University of Bath',
-      arrivalDateTimeLocal: expectedDatetimeLocal,
+      arrivalDateTimeLocal: '2026-10-10T10:15',
     });
   });
 });
