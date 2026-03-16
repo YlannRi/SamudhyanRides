@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSock
 
 from app.accounts.database import supabase
 from app.accounts.dependencies import get_current_user
+from app.contracts import MessageResponse, NotificationResponse, UnreadCountResponse
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
@@ -59,14 +60,14 @@ async def _poll_notifications(
         await asyncio.sleep(1)
 
 
-@router.get("/")
+@router.get("/", response_model=list[NotificationResponse])
 def get_notifications(current_user: dict = Depends(get_current_user)):
     """Return all notifications for the current user, newest first."""
     profile_id = get_profile_id(current_user["sub"])
-    return _list_notifications(profile_id)
+    return [_serialize_notification(notification) for notification in _list_notifications(profile_id)]
 
 
-@router.get("/unread-count")
+@router.get("/unread-count", response_model=UnreadCountResponse)
 def get_unread_count(current_user: dict = Depends(get_current_user)):
     """Return the count of unread notifications."""
     profile_id = get_profile_id(current_user["sub"])
@@ -80,7 +81,7 @@ def get_unread_count(current_user: dict = Depends(get_current_user)):
     return {"unread_count": res.count or 0}
 
 
-@router.put("/read-all")
+@router.put("/read-all", response_model=MessageResponse)
 def mark_all_read(current_user: dict = Depends(get_current_user)):
     """Mark all notifications as read."""
     profile_id = get_profile_id(current_user["sub"])
@@ -94,7 +95,7 @@ def mark_all_read(current_user: dict = Depends(get_current_user)):
     return {"message": "All notifications marked as read"}
 
 
-@router.put("/{notification_id}/read")
+@router.put("/{notification_id}/read", response_model=MessageResponse)
 def mark_read(notification_id: str, current_user: dict = Depends(get_current_user)):
     """Mark a single notification as read."""
     profile_id = get_profile_id(current_user["sub"])
@@ -116,7 +117,7 @@ def mark_read(notification_id: str, current_user: dict = Depends(get_current_use
     return {"message": "Notification marked as read"}
 
 
-@router.put("/read-by-link")
+@router.put("/read-by-link", response_model=MessageResponse)
 def mark_read_by_link(link: str, current_user: dict = Depends(get_current_user)):
     """Mark all notifications with a specific link as read (e.g. when opening a chat)."""
     profile_id = get_profile_id(current_user["sub"])

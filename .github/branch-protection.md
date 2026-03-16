@@ -22,6 +22,7 @@ Use these workflow job names as required checks:
 
 - `secret-scan`
 - `dependency-audit`
+- `api-contracts`
 - `database`
 - `backend`
 - `frontend`

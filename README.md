@@ -143,6 +143,26 @@ Dependency update automation is configured in `.github/dependabot.yml` for:
 - `frontend` `npm`
 - `backend` `pip`
 
+## API Contract Checks
+
+The repo now includes API contract checks to make sure the backend OpenAPI document and a few key runtime responses stay aligned with what the frontend expects.
+
+CI now runs an `api-contracts` job that:
+
+- validates the generated FastAPI OpenAPI document
+- runs focused contract tests against the real FastAPI app using `TestClient`
+- uploads the generated OpenAPI document as a workflow artifact
+
+The current contract coverage includes:
+
+- `/`
+- `/health`
+- `/auth/register`
+- `/auth/login`
+- `/auth/refresh`
+- `/notifications/`
+- `/notifications/unread-count`
+
 ## Performance Testing
 
 The repo now includes a backend performance harness under `backend/perf/`.

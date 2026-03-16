@@ -2,6 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import routing, users, drivers, rides, bookings, payments, ratings, incidents, auth, timetable, chat, notification
+from app.contracts import HealthResponse, RootResponse
 import uvicorn
 #redeploy
 app = FastAPI(title="Samudhyan Rides - Backend", version="1.0.1")
@@ -47,11 +48,11 @@ app.include_router(incidents.router)
 app.include_router(chat.router)
 app.include_router(notification.router)
 
-@app.get("/")
+@app.get("/", response_model=RootResponse, tags=["System"])
 def read_root():
     return {"status": "ok", "service": "backend"}
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse, tags=["System"])
 def health():
     return {"status":"ready", "port":8000}
 

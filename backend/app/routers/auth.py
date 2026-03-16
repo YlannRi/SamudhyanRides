@@ -1,5 +1,6 @@
 from app.accounts.database import create_supabase_client
 from app.accounts.dependencies import get_current_user
+from app.contracts import AuthTokensResponse, MessageResponse, RegisterResponse
 from fastapi import APIRouter, HTTPException, Depends
 from postgrest.exceptions import APIError
 from pydantic import BaseModel
@@ -14,7 +15,11 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: str
     password: str
-    full_name: str
+    full_name: str | None = None
+    first_name: str | None = None
+    middle_names: str | None = None
+    last_name: str | None = None
+    signup_as_driver: bool = False
 
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -24,7 +29,7 @@ def _looks_like_email(identifier: str) -> bool:
     return "@" in identifier
 
 # auth.py (inside the register function)
-@router.post("/register")
+@router.post("/register", response_model=RegisterResponse)
 def register(request: RegisterRequest):
     auth_client = create_supabase_client()
 
@@ -56,9 +61,14 @@ def register(request: RegisterRequest):
         if response.user is None:
             raise HTTPException(status_code=400, detail="Registration failed")
 
-        name_parts = request.full_name.strip().split(" ", 1)
-        first_name = name_parts[0]
-        last_name = name_parts[1] if len(name_parts) > 1 else ""
+        first_name = (request.first_name or "").strip()
+        last_name = (request.last_name or "").strip()
+
+        if not first_name:
+            full_name = (request.full_name or "").strip()
+            name_parts = full_name.split(" ", 1) if full_name else []
+            first_name = name_parts[0] if name_parts else ""
+            last_name = name_parts[1] if len(name_parts) > 1 else last_name
 
         uni_username = request.email.split("@")[0].lower()
 
@@ -79,7 +89,7 @@ def register(request: RegisterRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/login")
+@router.post("/login", response_model=AuthTokensResponse)
 def login(request: LoginRequest):
     auth_client = create_supabase_client()
 
@@ -122,7 +132,7 @@ def login(request: LoginRequest):
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
 
-@router.post("/refresh")
+@router.post("/refresh", response_model=AuthTokensResponse)
 def refresh(request: RefreshRequest):
     auth_client = create_supabase_client()
     try:
@@ -139,7 +149,7 @@ def refresh(request: RefreshRequest):
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
 
-@router.post("/logout")
+@router.post("/logout", response_model=MessageResponse)
 def logout(current_user: dict = Depends(get_current_user)):
     try:
         create_supabase_client().auth.sign_out()
