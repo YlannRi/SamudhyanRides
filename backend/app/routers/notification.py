@@ -30,14 +30,14 @@ def _list_notifications(profile_id: str, limit: int = 50) -> list[dict]:
     return res.data or []
 
 
-def _serialize_notification(notification: dict) -> dict:
+def _serialize_notification(notification: dict, profile_id: str | None = None) -> dict:
     return {
         "id": notification["id"],
-        "user_id": notification["user_id"],
-        "type": notification["type"],
+        "user_id": notification.get("user_id", profile_id or ""),
+        "type": notification.get("type", ""),
         "title": notification["title"],
         "body": notification.get("body", ""),
-        "created_at": notification["created_at"],
+        "created_at": notification.get("created_at", ""),
         "read": notification.get("read", False),
         "link": notification.get("link"),
     }
@@ -54,7 +54,7 @@ async def _poll_notifications(
             if notification["id"] in delivered_ids:
                 continue
 
-            await websocket.send_text(json.dumps(_serialize_notification(notification)))
+            await websocket.send_text(json.dumps(_serialize_notification(notification, profile_id)))
             delivered_ids.add(notification["id"])
 
         await asyncio.sleep(1)
@@ -64,7 +64,7 @@ async def _poll_notifications(
 def get_notifications(current_user: dict = Depends(get_current_user)):
     """Return all notifications for the current user, newest first."""
     profile_id = get_profile_id(current_user["sub"])
-    return [_serialize_notification(notification) for notification in _list_notifications(profile_id)]
+    return [_serialize_notification(notification, profile_id) for notification in _list_notifications(profile_id)]
 
 
 @router.get("/unread-count", response_model=UnreadCountResponse)
