@@ -1,6 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
-const baseURL = process.env.PW_BASE_URL || "http://localhost:5173";
+const defaultLocalPort = 4173;
+const baseURL = process.env.PW_BASE_URL || `http://localhost:${defaultLocalPort}`;
 const parsedBaseUrl = new URL(baseURL);
 const isLocalBaseUrl = ["localhost", "127.0.0.1"].includes(parsedBaseUrl.hostname);
 
@@ -14,7 +15,7 @@ export default defineConfig({
   webServer: isLocalBaseUrl
     ? {
         command: `npm run dev -- --host ${parsedBaseUrl.hostname || "localhost"} --port ${
-          parsedBaseUrl.port ? Number(parsedBaseUrl.port) : 5173
+          parsedBaseUrl.port ? Number(parsedBaseUrl.port) : defaultLocalPort
         }`,
         url: baseURL,
         reuseExistingServer: !process.env.CI,
