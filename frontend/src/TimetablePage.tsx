@@ -13,8 +13,9 @@ export type TimetableEvent = {
 
 export type RidePrefill = {
   origin?: string;
-  destination: string;
+  destination?: string;
   arrivalDateTimeLocal?: string; // yyyy-mm-ddThh:mm
+  pickupCoords?: { lat: number; lng: number };
 };
 
 function pad2(n: number) {

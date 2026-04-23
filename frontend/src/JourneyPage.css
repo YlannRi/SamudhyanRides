@@ -10,6 +10,49 @@
   box-sizing: border-box;
 }
 
+.journey-empty-pickup {
+  gap: 14px;
+  text-align: left;
+  color: var(--text-secondary);
+}
+
+.journey-empty-heading {
+  text-align: center;
+}
+
+.journey-empty-heading h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.journey-empty-heading p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.journey-empty-map {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.journey-empty-selection {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.journey-empty-pickup .sheet-action-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 /* ─── Map override (taller for journey) ──────────────────────── */
 .journey-map {
   margin: 0 0 16px !important;

@@ -9,7 +9,8 @@
     "perf:backend": "python backend/perf/run_suite.py",
     "perf:backend:matrix": "python backend/perf/run_matrix.py",
     "perf:backend:soak": "python backend/perf/run_matrix.py --soak-duration 15m --step-users 50,100",
-    "perf:backend:ramp": "python backend/perf/run_ramp.py --start-users 25 --step-users 25 --max-users 200 --run-time 2m --failure-rate-threshold-pct 1"
+    "perf:backend:ramp": "python backend/perf/run_ramp.py --start-users 25 --step-users 25 --max-users 200 --run-time 2m --failure-rate-threshold-pct 1",
+    "perf:backend:graph": "python backend/perf/plot_ramp_graph.py"
   },
   "dependencies": {
     "@vercel/speed-insights": "^2.0.0"

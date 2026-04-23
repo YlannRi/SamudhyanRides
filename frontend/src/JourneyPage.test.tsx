@@ -76,6 +76,14 @@ vi.mock('./components/Map/RideRenderMap', async () => {
   };
 });
 
+vi.mock('./components/Map/PickupPointMap', () => ({
+  PickupPointMap: ({ onPickupSelect }: { onPickupSelect: (lat: number, lng: number) => void }) => (
+    <button type="button" data-testid="pickup-point-map" onClick={() => onPickupSelect(51.38, -2.36)}>
+      Pickup Map
+    </button>
+  ),
+}));
+
 const defaultUserTrips = [
   {
     id: 1,
@@ -239,6 +247,31 @@ describe('JourneyPage', () => {
     await waitForJourneyLoad();
 
     expect(screen.getByText('No Active Journeys')).toBeInTheDocument();
+    expect(screen.getByTestId('pickup-point-map')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use selected pickup' })).toBeDisabled();
+  });
+
+  it('uses a map pin from the empty rider state as a pickup prefill', async () => {
+    installJourneyApiMock({ userTrips: [] });
+    const onSelectPickup = vi.fn();
+
+    render(
+      <JourneyPage
+        canUseDriverMode={true}
+        onDriverSignup={onDriverSignup}
+        onSelectPickup={onSelectPickup}
+      />,
+    );
+
+    await waitForJourneyLoad();
+
+    fireEvent.click(screen.getByTestId('pickup-point-map'));
+    fireEvent.click(screen.getByRole('button', { name: 'Use selected pickup' }));
+
+    expect(onSelectPickup).toHaveBeenCalledWith({
+      origin: 'Pinned pickup (51.38000, -2.36000)',
+      pickupCoords: { lat: 51.38, lng: -2.36 },
+    });
   });
 
   it('calls onDriverSignup instead of switching when driver mode is unavailable', async () => {

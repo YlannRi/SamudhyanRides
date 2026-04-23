@@ -67,9 +67,17 @@ vi.mock('./AccountPage', () => ({
 }));
 
 vi.mock('./JourneyPage', () => ({
-  default: ({ onDriverSignup, mode }: any) => (
+  default: ({ onDriverSignup, onSelectPickup, mode }: any) => (
     <div data-testid="journey-page" data-mode={mode}>
       <button onClick={onDriverSignup}>Journey Driver Signup</button>
+      <button
+        onClick={() => onSelectPickup?.({
+          origin: 'Pinned pickup (51.38000, -2.36000)',
+          pickupCoords: { lat: 51.38, lng: -2.36 },
+        })}
+      >
+        Journey Select Pickup
+      </button>
     </div>
   ),
 }));
@@ -561,6 +569,20 @@ describe('App Component', () => {
         expect(journeyPage).toBeInTheDocument();
         expect(journeyPage).toHaveAttribute('data-mode', 'driver');
       });
+    });
+
+    it('opens request ride with a pickup selected from the journey map', async () => {
+      vi.mocked(apiFetch).mockResolvedValueOnce({ is_driver: true });
+      render(<App />);
+      fireEvent.click(screen.getByText('Login'));
+      await waitFor(() => expect(screen.getByTestId('home-page')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByText('Journey'));
+      fireEvent.click(screen.getByText('Journey Select Pickup'));
+
+      expect(screen.getByTestId('request-page')).toHaveTextContent(
+        'Prefill: Pinned pickup (51.38000, -2.36000) to undefined',
+      );
     });
   });
 

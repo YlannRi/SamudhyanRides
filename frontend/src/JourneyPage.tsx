@@ -3,20 +3,69 @@ import './JourneyPage.css';
 import { DetailRow, Icons } from './App';
 import { Btn } from './App.tsx';
 import { RideRenderMap } from './components/Map/RideRenderMap';
+import { PickupPointMap } from './components/Map/PickupPointMap';
 import { apiFetch } from './lib/api';
+
+type PickupCoords = {
+  lat: number;
+  lng: number;
+};
+
+type PickupPrefill = {
+  origin: string;
+  pickupCoords: PickupCoords;
+};
+
+const formatPinnedPickupLabel = ({ lat, lng }: PickupCoords) => (
+  `Pinned pickup (${lat.toFixed(5)}, ${lng.toFixed(5)})`
+);
 
 
 // User Journey View
-const UserJourney: React.FC<{ trips: any[]; onOpenChat?: (rideId: string, participantId?: string) => void }> = ({ trips, onOpenChat }) => {
+const UserJourney: React.FC<{
+  trips: any[];
+  onOpenChat?: (rideId: string, participantId?: string) => void;
+  onSelectPickup?: (prefill: PickupPrefill) => void;
+}> = ({ trips, onOpenChat, onSelectPickup }) => {
   const [activeTripIdx, setActiveTripIdx] = useState(0);
   const [routeData, setRouteData] = useState<any>(null);
+  const [selectedPickup, setSelectedPickup] = useState<PickupCoords | null>(null);
 
   if (trips.length === 0) {
     return (
-      <div className="journey-content" style={{ alignItems: 'center', marginTop: '60px', color: 'var(--text-secondary)' }}>
+      <div className="journey-content journey-empty-pickup">
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗺️</div>
-        <h2 style={{ fontSize: '1.17em', margin: 0, fontWeight: 700 }}>No Active Journeys</h2>
-        <p>You don't have any rides currently in progress.</p>
+        <div className="journey-empty-heading">
+          <h2>No Active Journeys</h2>
+          <p>You don't have any rides currently in progress.</p>
+        </div>
+
+        <div className="journey-empty-map">
+          <PickupPointMap
+            height="280px"
+            initialPickup={selectedPickup ?? undefined}
+            onPickupSelect={(lat, lng) => setSelectedPickup({ lat, lng })}
+          />
+        </div>
+
+        <div className="journey-empty-selection">
+          {selectedPickup ? `Pickup pin: ${formatPinnedPickupLabel(selectedPickup)}` : 'Tap the map to place a pickup pin.'}
+        </div>
+
+        <button
+          type="button"
+          className="sheet-action-btn btn-accept"
+          disabled={!selectedPickup}
+          onClick={() => {
+            if (!selectedPickup) return;
+            onSelectPickup?.({
+              origin: formatPinnedPickupLabel(selectedPickup),
+              pickupCoords: selectedPickup,
+            });
+          }}
+        >
+          Use selected pickup
+        </button>
       </div>
     );
   }
@@ -288,9 +337,10 @@ const JourneyPage: React.FC<{
   canUseDriverMode: boolean;
   onDriverSignup: () => void;
   onOpenChat?: (rideId: string, participantId?: string) => void;
+  onSelectPickup?: (prefill: PickupPrefill) => void;
   mode?: 'user' | 'driver';
   onModeChange?: (mode: 'user' | 'driver') => void;
-}> = ({ canUseDriverMode, onDriverSignup, onOpenChat, mode, onModeChange }) => {
+}> = ({ canUseDriverMode, onDriverSignup, onOpenChat, onSelectPickup, mode, onModeChange }) => {
   const [internalMode, setInternalMode] = useState<'user' | 'driver'>('user');
   const currentMode = mode ?? internalMode;
   const setCurrentMode = (nextMode: 'user' | 'driver') => {
@@ -396,7 +446,7 @@ const JourneyPage: React.FC<{
         <p style={{ textAlign: 'center', marginTop: '40px', color: 'var(--text-secondary)' }}>Loading your journeys...</p>
       ) : (
         currentMode === 'user' ? (
-          <UserJourney trips={activeUserTrips} onOpenChat={onOpenChat} />
+          <UserJourney trips={activeUserTrips} onOpenChat={onOpenChat} onSelectPickup={onSelectPickup} />
         ) : (
           <DriverJourney rides={activeDriverRides} onComplete={handleCompleteRide} onOpenChat={onOpenChat} />
         )

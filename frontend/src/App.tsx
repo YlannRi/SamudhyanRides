@@ -503,6 +503,10 @@ const App: React.FC = () => {
             canUseDriverMode={canUseDriverMode}
             onDriverSignup={() => startDriverSignup('journey')}
             onOpenChat={openChat}
+            onSelectPickup={(prefill) => {
+              setRequestRidePrefill(prefill);
+              navigate('request');
+            }}
             mode={journeyMode}
             onModeChange={setJourneyMode}
           />

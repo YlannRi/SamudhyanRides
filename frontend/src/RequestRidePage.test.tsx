@@ -3,18 +3,38 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import RequestRidePage from './RequestRidePage';
 import { apiFetch } from './lib/api';
 
+const requestRideMocks = vi.hoisted(() => ({
+  geocodeAddress: vi.fn(),
+}));
+
 vi.mock('./lib/api', () => ({
   apiFetch: vi.fn(),
 }));
 
+vi.mock('./components/Map/useGeocode', () => ({
+  useGeocode: () => ({
+    geocodeAddress: requestRideMocks.geocodeAddress,
+    loading: false,
+    error: null,
+  }),
+}));
+
 vi.mock('./components/Map/RideRenderMap', () => ({
-  RideRenderMap: ({ onPickupSelect }: { onPickupSelect?: (lat: number, lng: number) => void }) => (
+  RideRenderMap: ({
+    rideId,
+    existingPickup,
+    onPickupSelect,
+  }: {
+    rideId: number;
+    existingPickup?: { lat: number; lng: number };
+    onPickupSelect?: (lat: number, lng: number) => void;
+  }) => (
     <button
       type="button"
-      data-testid="mock-map"
+      data-testid={`mock-map-${rideId}`}
       onClick={() => onPickupSelect?.(51.38, -2.36)}
     >
-      Mock Map
+      Mock Map {existingPickup ? `${existingPickup.lat},${existingPickup.lng}` : 'no pickup'}
     </button>
   ),
 }));
@@ -29,9 +49,18 @@ const searchResult = {
   price: '3.50',
 };
 
+const fillPickup = (value = 'Oldfield Park') => {
+  fireEvent.change(screen.getByLabelText('Pickup location'), {
+    target: { value },
+  });
+};
+
 describe('RequestRidePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requestRideMocks.geocodeAddress.mockResolvedValue([
+      { label: 'Oldfield Park, Bath', lat: 51.381, lng: -2.36 },
+    ]);
     window.localStorage.clear();
     window.localStorage.setItem('authToken', 'fake-jwt-token');
   });
@@ -40,37 +69,58 @@ describe('RequestRidePage', () => {
     render(<RequestRidePage />);
 
     expect(screen.getByText('Request a Ride')).toBeInTheDocument();
-    expect(screen.getByLabelText('Pick-up area (optional)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pickup location')).toBeInTheDocument();
     expect(screen.getByLabelText('Destination')).toBeInTheDocument();
     expect(screen.getByLabelText('Time of arrival (optional)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Search Rides' })).toBeInTheDocument();
   });
 
-  it('prefills destination and time when provided', () => {
+  it('prefills pickup, destination, and time when provided', () => {
     render(
       <RequestRidePage
         prefill={{
+          origin: 'Oldfield Park',
           destination: 'University of Bath',
           arrivalDateTimeLocal: '2026-10-10T12:00',
         }}
       />,
     );
 
+    expect(screen.getByLabelText('Pickup location')).toHaveValue('Oldfield Park');
     expect(screen.getByLabelText('Destination')).toHaveValue('University of Bath');
     expect(screen.getByLabelText('Time of arrival (optional)')).toHaveValue('2026-10-10T12:00');
+  });
+
+  it('uses prefilled map pickup coordinates without geocoding again', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce([searchResult]);
+
+    render(
+      <RequestRidePage
+        prefill={{
+          origin: 'Pinned pickup (51.38000, -2.36000)',
+          pickupCoords: { lat: 51.38, lng: -2.36 },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
+
+    await waitFor(() => {
+      expect(requestRideMocks.geocodeAddress).not.toHaveBeenCalled();
+      expect(apiFetch).toHaveBeenCalledWith('rides/', { method: 'GET' });
+      expect(screen.getByTestId('mock-map-101')).toHaveTextContent('51.38,-2.36');
+    });
   });
 
   it('updates search fields when the user types', () => {
     render(<RequestRidePage />);
 
-    fireEvent.change(screen.getByLabelText('Pick-up area (optional)'), {
-      target: { value: 'Oldfield Park' },
-    });
+    fillPickup();
     fireEvent.change(screen.getByLabelText('Destination'), {
       target: { value: 'University of Bath' },
     });
 
-    expect(screen.getByLabelText('Pick-up area (optional)')).toHaveValue('Oldfield Park');
+    expect(screen.getByLabelText('Pickup location')).toHaveValue('Oldfield Park');
     expect(screen.getByLabelText('Destination')).toHaveValue('University of Bath');
   });
 
@@ -78,11 +128,13 @@ describe('RequestRidePage', () => {
     window.localStorage.removeItem('authToken');
 
     render(<RequestRidePage />);
+    fillPickup();
     fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
 
     await waitFor(() => {
       expect(screen.getByText('No authentication token found. Please log in again.')).toBeInTheDocument();
     });
+    expect(requestRideMocks.geocodeAddress).not.toHaveBeenCalled();
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
@@ -90,6 +142,7 @@ describe('RequestRidePage', () => {
     vi.mocked(apiFetch).mockRejectedValueOnce('String-based search error');
 
     render(<RequestRidePage />);
+    fillPickup();
     fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
 
     await waitFor(() => {
@@ -97,20 +150,32 @@ describe('RequestRidePage', () => {
     });
   });
 
-  it('submits the current origin and destination as query params', async () => {
+  it('shows a pickup geocoding error before browsing rides', async () => {
+    requestRideMocks.geocodeAddress.mockResolvedValueOnce([]);
+
+    render(<RequestRidePage />);
+    fillPickup('Unknown place');
+    fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Pickup location not found.')).toBeInTheDocument();
+    });
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it('submits the current pickup and destination as query params', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([]);
 
     render(<RequestRidePage />);
 
-    fireEvent.change(screen.getByLabelText('Pick-up area (optional)'), {
-      target: { value: 'Oldfield Park' },
-    });
+    fillPickup();
     fireEvent.change(screen.getByLabelText('Destination'), {
       target: { value: 'University of Bath' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
 
     await waitFor(() => {
+      expect(requestRideMocks.geocodeAddress).toHaveBeenCalledWith('Oldfield Park');
       expect(apiFetch).toHaveBeenCalledWith(
         'rides/?origin=Oldfield+Park&destination=University+of+Bath',
         { method: 'GET' },
@@ -118,10 +183,11 @@ describe('RequestRidePage', () => {
     });
   });
 
-  it('keeps the results area empty when search returns no rides', async () => {
+  it('shows an empty state when search returns no rides', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([]);
 
     render(<RequestRidePage />);
+    fillPickup();
     fireEvent.change(screen.getByLabelText('Destination'), {
       target: { value: 'Nowhere' },
     });
@@ -130,66 +196,74 @@ describe('RequestRidePage', () => {
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalled();
     });
+    expect(screen.getByText('No rides found')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Request' })).not.toBeInTheDocument();
     expect(screen.queryByText('Booking request sent successfully!')).not.toBeInTheDocument();
   });
 
-  it('renders returned rides using the current card format', async () => {
+  it('renders returned rides with an inline pickup route map', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([searchResult]);
 
     render(<RequestRidePage />);
+    fillPickup();
     fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
 
     await waitFor(() => {
       expect(screen.getByText('University of Bath')).toBeInTheDocument();
       expect(screen.getByText('From: Oldfield Park')).toBeInTheDocument();
+      expect(screen.getByText('Pickup: Oldfield Park, Bath')).toBeInTheDocument();
       expect(screen.getByText('Driver: Alice')).toBeInTheDocument();
+      expect(screen.getByTestId('mock-map-101')).toHaveTextContent('51.381,-2.36');
       expect(screen.getByText('Request')).toBeInTheDocument();
     });
   });
 
-  it('books a ride after selecting a pickup point on the map', async () => {
+  it('books a ride from the inline result map after selecting a pickup point', async () => {
     vi.mocked(apiFetch)
       .mockResolvedValueOnce([searchResult])
       .mockResolvedValueOnce({});
 
     render(<RequestRidePage />);
+    fillPickup();
     fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Request' })).toBeInTheDocument();
     });
+
+    fireEvent.click(screen.getByTestId('mock-map-101'));
     fireEvent.click(screen.getByRole('button', { name: 'Request' }));
 
-    expect(screen.getByText('Book Ride to University of Bath')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId('mock-map'));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm Pickup & Request' }));
-
     await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith(
-        'bookings/?ride_id=101&pickup_location=Map+Point&dropoff_location=University+of+Bath&price=3.5&pickup_lat=51.38&pickup_lng=-2.36',
+      expect(apiFetch).toHaveBeenLastCalledWith(
+        'bookings/?ride_id=101&pickup_location=Oldfield+Park&dropoff_location=University+of+Bath&price=3.5&pickup_lat=51.38&pickup_lng=-2.36',
         { method: 'POST' },
       );
       expect(screen.getByText('Booking request sent successfully!')).toBeInTheDocument();
     });
   });
 
-  it('lets the user return from booking to the search screen', async () => {
-    vi.mocked(apiFetch).mockResolvedValueOnce([searchResult]);
+  it('books a ride with the geocoded pickup when the map is not adjusted', async () => {
+    vi.mocked(apiFetch)
+      .mockResolvedValueOnce([searchResult])
+      .mockResolvedValueOnce({});
 
     render(<RequestRidePage />);
+    fillPickup();
     fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Request' })).toBeInTheDocument();
     });
+
     fireEvent.click(screen.getByRole('button', { name: 'Request' }));
 
-    fireEvent.click(screen.getAllByRole('button')[0]);
-
-    expect(screen.getByText('Request a Ride')).toBeInTheDocument();
-    expect(screen.queryByText('Book Ride to University of Bath')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenLastCalledWith(
+        'bookings/?ride_id=101&pickup_location=Oldfield+Park&dropoff_location=University+of+Bath&price=3.5&pickup_lat=51.381&pickup_lng=-2.36',
+        { method: 'POST' },
+      );
+    });
   });
 
   it('shows an error when booking fails with an Error object', async () => {
@@ -198,13 +272,13 @@ describe('RequestRidePage', () => {
       .mockRejectedValueOnce(new Error('Booking system offline'));
 
     render(<RequestRidePage />);
+    fillPickup();
     fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Request' })).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole('button', { name: 'Request' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Request Without Specific Pickup' }));
 
     await waitFor(() => {
       expect(screen.getByText('Booking system offline')).toBeInTheDocument();
@@ -217,13 +291,13 @@ describe('RequestRidePage', () => {
       .mockRejectedValueOnce('String-based booking error');
 
     render(<RequestRidePage />);
+    fillPickup();
     fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Request' })).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole('button', { name: 'Request' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Request Without Specific Pickup' }));
 
     await waitFor(() => {
       expect(screen.getByText('String-based booking error')).toBeInTheDocument();

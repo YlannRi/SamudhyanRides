@@ -645,6 +645,77 @@ body {
   gap: 8px;
 }
 
+.ride-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ride-result-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 176px;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px;
+  cursor: default;
+}
+
+.ride-result-card:hover {
+  transform: none;
+}
+
+.ride-result-details {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ride-result-copy {
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+}
+
+.ride-result-map {
+  min-height: 180px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ride-result-request {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+.ride-result-request:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.request-pickup-status {
+  margin-top: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(34, 197, 94, 0.14);
+  color: var(--color-green-light);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.request-booking-error {
+  margin: 8px 0 0;
+  color: #fca5a5;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.request-booking-success {
+  margin: 8px 0 0;
+}
+
 /* Single row card */
 
 .trip-row-card {
@@ -1076,6 +1147,14 @@ body {
     flex: 1 1 100%;
     width: 100%;
   }
+
+  .ride-result-card {
+    grid-template-columns: 1fr;
+  }
+
+  .ride-result-map {
+    width: 100%;
+  }
 }
 /* Home page layout (matches screenshot style) */
 .home-body {
@@ -1225,6 +1304,7 @@ body {
 .auth-toggle-button:focus-visible,
 .auth-link-button:focus-visible,
 .auth-submit:focus-visible,
+.ride-result-request:focus-visible,
 .sheet-action-btn:focus-visible,
 .rating-btn-cancel:focus-visible,
 .rating-btn-submit:focus-visible,
