@@ -295,6 +295,37 @@ describe('JourneyPage', () => {
     });
   });
 
+  it('falls back to coordinate labels when reverse geocoding returns the placeholder text', async () => {
+    installJourneyApiMock({ userTrips: [] });
+    const onSelectPickup = vi.fn();
+    geocodeMocks.reverseGeocode.mockResolvedValueOnce({
+      label: 'Selected map pickup',
+      lat: 51.38,
+      lng: -2.36,
+    });
+
+    render(
+      <JourneyPage
+        canUseDriverMode={true}
+        onDriverSignup={onDriverSignup}
+        onSelectPickup={onSelectPickup}
+      />,
+    );
+
+    await waitForJourneyLoad();
+
+    fireEvent.click(screen.getByTestId('pickup-point-map'));
+    await waitFor(() => {
+      expect(screen.getByText('Pickup pin: Pinned pickup (51.38000, -2.36000)')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Use selected pickup' }));
+
+    expect(onSelectPickup).toHaveBeenCalledWith({
+      origin: 'Pinned pickup (51.38000, -2.36000)',
+      pickupCoords: { lat: 51.38, lng: -2.36 },
+    });
+  });
+
   it('calls onDriverSignup instead of switching when driver mode is unavailable', async () => {
     installJourneyApiMock();
 

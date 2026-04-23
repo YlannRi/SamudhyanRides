@@ -28,8 +28,23 @@ type PickupCoords = {
 };
 
 const MAP_PICKUP_FALLBACK = 'Selected map pickup';
+const formatPinnedPickupLabel = ({ lat, lng }: PickupCoords) =>
+  `Pinned pickup (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+
 const isFallbackPickupLabel = (value?: string | null) =>
   value?.trim().toLowerCase() === MAP_PICKUP_FALLBACK.toLowerCase();
+
+const getPickupDisplayLabel = (
+  coords: PickupCoords,
+  label?: string | null,
+) => {
+  const trimmedLabel = label?.trim();
+  if (trimmedLabel && !isFallbackPickupLabel(trimmedLabel)) {
+    return trimmedLabel;
+  }
+
+  return formatPinnedPickupLabel(coords);
+};
 
 const CarIcon = () => (
   <svg
@@ -80,7 +95,7 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
 
   const lookupPickupLabel = async (lat: number, lng: number) => {
     const result = await reverseGeocode(lat, lng);
-    return result?.label?.trim() || MAP_PICKUP_FALLBACK;
+    return getPickupDisplayLabel({ lat, lng }, result?.label);
   };
 
   const resolveMapPickup = async (lat: number, lng: number) => {
@@ -101,8 +116,9 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
     } catch {
       if (lookupId !== pickupLookupId.current) return;
 
-      setPickupLabel(MAP_PICKUP_FALLBACK);
-      setPickupInput(MAP_PICKUP_FALLBACK);
+      const fallbackLabel = formatPinnedPickupLabel({ lat, lng });
+      setPickupLabel(fallbackLabel);
+      setPickupInput(fallbackLabel);
     } finally {
       if (lookupId === pickupLookupId.current) {
         setPickupResolving(false);

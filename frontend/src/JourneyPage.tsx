@@ -18,6 +18,20 @@ type PickupPrefill = {
 };
 
 const MAP_PICKUP_FALLBACK = 'Selected map pickup';
+const formatPinnedPickupLabel = ({ lat, lng }: PickupCoords) =>
+  `Pinned pickup (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+
+const getPickupDisplayLabel = (
+  coords: PickupCoords,
+  label?: string | null,
+) => {
+  const trimmedLabel = label?.trim();
+  if (trimmedLabel && trimmedLabel !== MAP_PICKUP_FALLBACK) {
+    return trimmedLabel;
+  }
+
+  return formatPinnedPickupLabel(coords);
+};
 
 
 // User Journey View
@@ -45,10 +59,10 @@ const UserJourney: React.FC<{
     try {
       const result = await reverseGeocode(lat, lng);
       if (lookupId !== pickupLookupId.current) return;
-      setSelectedPickupLabel(result?.label?.trim() || MAP_PICKUP_FALLBACK);
+      setSelectedPickupLabel(getPickupDisplayLabel({ lat, lng }, result?.label));
     } catch {
       if (lookupId !== pickupLookupId.current) return;
-      setSelectedPickupLabel(MAP_PICKUP_FALLBACK);
+      setSelectedPickupLabel(formatPinnedPickupLabel({ lat, lng }));
     } finally {
       if (lookupId === pickupLookupId.current) {
         setIsResolvingPickup(false);
@@ -75,7 +89,7 @@ const UserJourney: React.FC<{
 
         <div className="journey-empty-selection">
           {selectedPickup
-            ? `Pickup pin: ${isResolvingPickup ? 'Finding closest address...' : selectedPickupLabel || MAP_PICKUP_FALLBACK}`
+            ? `Pickup pin: ${isResolvingPickup ? 'Finding closest address...' : getPickupDisplayLabel(selectedPickup, selectedPickupLabel)}`
             : 'Tap the map to place a pickup pin.'}
         </div>
 
@@ -86,7 +100,7 @@ const UserJourney: React.FC<{
           onClick={() => {
             if (!selectedPickup) return;
             onSelectPickup?.({
-              origin: selectedPickupLabel || MAP_PICKUP_FALLBACK,
+              origin: getPickupDisplayLabel(selectedPickup, selectedPickupLabel),
               pickupCoords: selectedPickup,
             });
           }}

@@ -135,6 +135,29 @@ describe('RequestRidePage', () => {
     });
   });
 
+  it('falls back to coordinates when reverse geocoding still returns the placeholder text', async () => {
+    requestRideMocks.reverseGeocode.mockResolvedValueOnce({
+      label: 'Selected map pickup',
+      lat: 51.38,
+      lng: -2.36,
+    });
+
+    render(
+      <RequestRidePage
+        prefill={{
+          origin: 'Selected map pickup',
+          pickupCoords: { lat: 51.38, lng: -2.36 },
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(requestRideMocks.reverseGeocode).toHaveBeenCalledWith(51.38, -2.36);
+      expect(screen.getByLabelText('Pickup location')).toHaveValue('Pinned pickup (51.38000, -2.36000)');
+      expect(screen.getByText('Pickup set: Pinned pickup (51.38000, -2.36000)')).toBeInTheDocument();
+    });
+  });
+
   it('updates search fields when the user types', () => {
     render(<RequestRidePage />);
 
