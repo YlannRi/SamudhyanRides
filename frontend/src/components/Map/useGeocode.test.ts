@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiFetch } from '../../lib/api';
 import { useGeocode } from './useGeocode';
 
@@ -10,6 +10,10 @@ vi.mock('../../lib/api', () => ({
 describe('useGeocode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('returns an empty result without calling the API for blank input', async () => {
@@ -117,10 +121,51 @@ describe('useGeocode', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('falls back to a browser-callable reverse geocoder when the backend route is unavailable', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const backendFailure = new Error('Request failed: 404 Not Found');
+    vi.mocked(apiFetch).mockRejectedValueOnce(backendFailure);
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        locality: 'Bath',
+        postcode: 'BA1 1',
+        principalSubdivision: 'England',
+        latitude: 51.37786,
+        longitude: -2.35785,
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useGeocode());
+    let reverseResult: Awaited<ReturnType<typeof result.current.reverseGeocode>> = null;
+
+    await act(async () => {
+      reverseResult = await result.current.reverseGeocode(51.37786, -2.35785);
+    });
+
+    expect(apiFetch).toHaveBeenCalledWith('/routing/reverse-geocode?lat=51.37786&lng=-2.35785', { method: 'GET' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=51.37786&longitude=-2.35785&localityLanguage=en',
+      { method: 'GET' },
+    );
+    expect(reverseResult).toEqual({
+      label: 'Bath, BA1 1',
+      lat: 51.37786,
+      lng: -2.35785,
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.error).toBeNull();
+
+    consoleSpy.mockRestore();
+  });
+
   it('stores an error and rethrows when reverse geocoding fails', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const failure = new Error('Reverse geocoder offline');
-    vi.mocked(apiFetch).mockRejectedValueOnce(failure);
+    const backendFailure = new Error('Reverse geocoder offline');
+    vi.mocked(apiFetch).mockRejectedValueOnce(backendFailure);
+    const fetchFailure = new Error('Fallback reverse geocoder offline');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(fetchFailure));
 
     const { result } = renderHook(() => useGeocode());
     let thrown: unknown;
@@ -133,10 +178,11 @@ describe('useGeocode', () => {
       }
     });
 
-    expect(thrown).toBe(failure);
+    expect(thrown).toBe(fetchFailure);
     expect(result.current.loading).toBe(false);
-    expect(result.current.error).toBe('Reverse geocoder offline');
-    expect(consoleSpy).toHaveBeenCalledWith('Error during reverse geocoding:', failure);
+    expect(result.current.error).toBe('Fallback reverse geocoder offline');
+    expect(consoleSpy).toHaveBeenCalledWith('Error during reverse geocoding:', backendFailure);
+    expect(consoleSpy).toHaveBeenCalledWith('Error during reverse geocoding fallback:', fetchFailure);
 
     consoleSpy.mockRestore();
   });
