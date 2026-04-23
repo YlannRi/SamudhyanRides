@@ -28,6 +28,8 @@ type PickupCoords = {
 };
 
 const MAP_PICKUP_FALLBACK = 'Selected map pickup';
+const isFallbackPickupLabel = (value?: string | null) =>
+  value?.trim().toLowerCase() === MAP_PICKUP_FALLBACK.toLowerCase();
 
 const CarIcon = () => (
   <svg
@@ -76,6 +78,11 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
     setBookingSuccessRideId(null);
   };
 
+  const lookupPickupLabel = async (lat: number, lng: number) => {
+    const result = await reverseGeocode(lat, lng);
+    return result?.label?.trim() || MAP_PICKUP_FALLBACK;
+  };
+
   const resolveMapPickup = async (lat: number, lng: number) => {
     const lookupId = pickupLookupId.current + 1;
     pickupLookupId.current = lookupId;
@@ -87,10 +94,8 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
     setBookingSuccessRideId(null);
 
     try {
-      const result = await reverseGeocode(lat, lng);
+      const label = await lookupPickupLabel(lat, lng);
       if (lookupId !== pickupLookupId.current) return;
-
-      const label = result?.label?.trim() || MAP_PICKUP_FALLBACK;
       setPickupLabel(label);
       setPickupInput(label);
     } catch {
@@ -107,14 +112,18 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
 
   useEffect(() => {
     if (!prefill) return;
-    if (prefill.origin) {
-      setPickupInput(prefill.origin);
-      setPickupLabel(prefill.origin);
+    const trimmedOrigin = prefill.origin?.trim() ?? '';
+    const shouldReusePrefillOrigin = Boolean(trimmedOrigin) && !isFallbackPickupLabel(trimmedOrigin);
+
+    if (trimmedOrigin && (!prefill.pickupCoords || shouldReusePrefillOrigin)) {
+      setPickupInput(trimmedOrigin);
+      setPickupLabel(trimmedOrigin);
     }
     if (prefill.pickupCoords) {
       setPickupCoords(prefill.pickupCoords);
-      if (prefill.origin) {
-        setPickupLabel(prefill.origin);
+      if (shouldReusePrefillOrigin) {
+        setPickupInput(trimmedOrigin);
+        setPickupLabel(trimmedOrigin);
       } else {
         void resolveMapPickup(prefill.pickupCoords.lat, prefill.pickupCoords.lng);
       }
@@ -150,7 +159,13 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
       if (pickupResolving) throw new Error('Finding closest pickup address. Try again in a moment.');
 
       if (pickupCoords) {
-        setPickupLabel(pickupLabel || pickup);
+        if (!pickupLabel || isFallbackPickupLabel(pickupLabel) || isFallbackPickupLabel(pickup)) {
+          const resolvedLabel = await lookupPickupLabel(pickupCoords.lat, pickupCoords.lng);
+          setPickupLabel(resolvedLabel);
+          setPickupInput(resolvedLabel);
+        } else {
+          setPickupLabel(pickupLabel || pickup);
+        }
       } else {
         const pickupResults = await geocodeAddress(pickup);
         const nextPickup = pickupResults[0];
@@ -182,7 +197,12 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
     try {
       if (pickupResolving) throw new Error('Finding closest pickup address. Try again in a moment.');
 
-      const pickupLocation = (pickupLabel || pickupInput).trim();
+      let pickupLocation = (pickupLabel || pickupInput).trim();
+      if (pickupCoords && (!pickupLocation || isFallbackPickupLabel(pickupLocation))) {
+        pickupLocation = await lookupPickupLabel(pickupCoords.lat, pickupCoords.lng);
+        setPickupLabel(pickupLocation);
+        setPickupInput(pickupLocation);
+      }
       if (!pickupLocation) throw new Error('Enter a pickup location before requesting this ride.');
 
       const numericPrice = parseFloat((ride.price ?? '0').replace(/[\u00A3$,]/g, '') || '0');

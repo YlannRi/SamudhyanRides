@@ -119,6 +119,22 @@ describe('RequestRidePage', () => {
     });
   });
 
+  it('retries reverse geocoding when the prefilled pickup label is still the fallback text', async () => {
+    render(
+      <RequestRidePage
+        prefill={{
+          origin: 'Selected map pickup',
+          pickupCoords: { lat: 51.38, lng: -2.36 },
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(requestRideMocks.reverseGeocode).toHaveBeenCalledWith(51.38, -2.36);
+      expect(screen.getByLabelText('Pickup location')).toHaveValue('Lower Bristol Road, Bath');
+    });
+  });
+
   it('updates search fields when the user types', () => {
     render(<RequestRidePage />);
 
