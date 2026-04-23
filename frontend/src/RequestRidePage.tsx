@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiFetch } from './lib/api';
 import { RideRenderMap } from './components/Map/RideRenderMap';
 import { useGeocode } from './components/Map/useGeocode';
@@ -27,9 +27,7 @@ type PickupCoords = {
   lng: number;
 };
 
-const formatPinnedPickupLabel = ({ lat, lng }: PickupCoords) => (
-  `Pinned pickup (${lat.toFixed(5)}, ${lng.toFixed(5)})`
-);
+const MAP_PICKUP_FALLBACK = 'Selected map pickup';
 
 const CarIcon = () => (
   <svg
@@ -59,31 +57,16 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
   const [pickupInput, setPickupInput] = useState('');
   const [pickupLabel, setPickupLabel] = useState('');
   const [pickupCoords, setPickupCoords] = useState<PickupCoords | null>(null);
-  const [pickupFromMap, setPickupFromMap] = useState(false);
+  const [pickupResolving, setPickupResolving] = useState(false);
   const [destinationInput, setDestinationInput] = useState('');
   const [timeInput, setTimeInput] = useState('');
+  const pickupLookupId = useRef(0);
 
   const [bookingLoadingRideId, setBookingLoadingRideId] = useState<number | null>(null);
   const [bookingError, setBookingError] = useState<{ rideId: number; message: string } | null>(null);
   const [bookingSuccessRideId, setBookingSuccessRideId] = useState<number | null>(null);
 
-  const { geocodeAddress } = useGeocode();
-
-  useEffect(() => {
-    if (!prefill) return;
-    if (prefill.origin) {
-      setPickupInput(prefill.origin);
-      setPickupLabel(prefill.origin);
-    }
-    if (prefill.pickupCoords) {
-      setPickupCoords(prefill.pickupCoords);
-      setPickupFromMap(true);
-      setPickupLabel(prefill.origin || formatPinnedPickupLabel(prefill.pickupCoords));
-      if (!prefill.origin) setPickupInput(formatPinnedPickupLabel(prefill.pickupCoords));
-    }
-    if (prefill.destination) setDestinationInput(prefill.destination);
-    if (prefill.arrivalDateTimeLocal) setTimeInput(prefill.arrivalDateTimeLocal);
-  }, [prefill]);
+  const { geocodeAddress, reverseGeocode } = useGeocode();
 
   const clearBrowseResults = () => {
     setRides([]);
@@ -93,10 +76,58 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
     setBookingSuccessRideId(null);
   };
 
+  const resolveMapPickup = async (lat: number, lng: number) => {
+    const lookupId = pickupLookupId.current + 1;
+    pickupLookupId.current = lookupId;
+
+    setPickupCoords({ lat, lng });
+    setPickupLabel('');
+    setPickupResolving(true);
+    setBookingError(null);
+    setBookingSuccessRideId(null);
+
+    try {
+      const result = await reverseGeocode(lat, lng);
+      if (lookupId !== pickupLookupId.current) return;
+
+      const label = result?.label?.trim() || MAP_PICKUP_FALLBACK;
+      setPickupLabel(label);
+      setPickupInput(label);
+    } catch {
+      if (lookupId !== pickupLookupId.current) return;
+
+      setPickupLabel(MAP_PICKUP_FALLBACK);
+      setPickupInput(MAP_PICKUP_FALLBACK);
+    } finally {
+      if (lookupId === pickupLookupId.current) {
+        setPickupResolving(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.origin) {
+      setPickupInput(prefill.origin);
+      setPickupLabel(prefill.origin);
+    }
+    if (prefill.pickupCoords) {
+      setPickupCoords(prefill.pickupCoords);
+      if (prefill.origin) {
+        setPickupLabel(prefill.origin);
+      } else {
+        void resolveMapPickup(prefill.pickupCoords.lat, prefill.pickupCoords.lng);
+      }
+    }
+    if (prefill.destination) setDestinationInput(prefill.destination);
+    if (prefill.arrivalDateTimeLocal) setTimeInput(prefill.arrivalDateTimeLocal);
+  }, [prefill]);
+
   const handlePickupChange = (value: string) => {
+    pickupLookupId.current += 1;
     setPickupInput(value);
     setPickupCoords(null);
-    setPickupFromMap(false);
+    setPickupResolving(false);
     setPickupLabel('');
     clearBrowseResults();
   };
@@ -116,6 +147,8 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
       const pickup = pickupInput.trim();
       if (!pickup) throw new Error('Enter a pickup location before browsing rides.');
 
+      if (pickupResolving) throw new Error('Finding closest pickup address. Try again in a moment.');
+
       if (pickupCoords) {
         setPickupLabel(pickupLabel || pickup);
       } else {
@@ -124,12 +157,10 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
         if (!nextPickup) throw new Error('Pickup location not found.');
 
         setPickupCoords({ lat: nextPickup.lat, lng: nextPickup.lng });
-        setPickupFromMap(false);
         setPickupLabel(nextPickup.label || pickup);
       }
 
       const params = new URLSearchParams();
-      if (!pickupFromMap) params.append('origin', pickup);
       if (destinationInput.trim()) params.append('destination', destinationInput.trim());
 
       const queryString = params.toString();
@@ -149,7 +180,9 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
     setBookingSuccessRideId(null);
 
     try {
-      const pickupLocation = pickupInput.trim();
+      if (pickupResolving) throw new Error('Finding closest pickup address. Try again in a moment.');
+
+      const pickupLocation = (pickupLabel || pickupInput).trim();
       if (!pickupLocation) throw new Error('Enter a pickup location before requesting this ride.');
 
       const numericPrice = parseFloat((ride.price ?? '0').replace(/[\u00A3$,]/g, '') || '0');
@@ -233,12 +266,12 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
 
           {pickupCoords && (
             <div className="request-pickup-status">
-              Pickup set: {pickupLabel || pickupInput}
+              Pickup set: {pickupResolving ? 'Finding closest address...' : pickupLabel || pickupInput}
             </div>
           )}
 
-          <button type="submit" className="auth-submit" disabled={loading} style={{ marginTop: '12px' }}>
-            {loading ? 'Searching...' : 'Search Rides'}
+          <button type="submit" className="auth-submit" disabled={loading || pickupResolving} style={{ marginTop: '12px' }}>
+            {loading ? 'Searching...' : pickupResolving ? 'Finding pickup...' : 'Search Rides'}
           </button>
         </form>
       </div>
@@ -256,7 +289,9 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
                   <div className="trip-row-meta">{formatDateOnly(ride.departure_time)}</div>
                   {ride.departure_time && <div className="trip-row-meta">{formatTimeOnly(ride.departure_time)}</div>}
                   <div className="trip-row-meta">From: {ride.origin || '-'}</div>
-                  <div className="trip-row-meta">Pickup: {pickupLabel || pickupInput}</div>
+                  <div className="trip-row-meta">
+                    Pickup: {pickupResolving ? 'Finding closest address...' : pickupLabel || pickupInput}
+                  </div>
                   {ride.driver_name && <div className="trip-row-meta">Driver: {ride.driver_name}</div>}
                   {ride.driver_rating !== undefined && ride.driver_rating > 0 && (
                     <div className="trip-row-meta">Rating: {ride.driver_rating.toFixed(1)}</div>
@@ -274,7 +309,7 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
                     type="button"
                     className="pill pill-solid ride-result-request"
                     onClick={() => void handleBookRide(ride)}
-                    disabled={bookingLoadingRideId === ride.id || bookingSuccessRideId === ride.id}
+                    disabled={pickupResolving || bookingLoadingRideId === ride.id || bookingSuccessRideId === ride.id}
                   >
                     {bookingLoadingRideId === ride.id ? 'Requesting...' : bookingSuccessRideId === ride.id ? 'Requested' : 'Request'}
                   </button>
@@ -286,12 +321,7 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
                   rideId={ride.id}
                   height="180px"
                   existingPickup={pickupCoords ?? undefined}
-                  onPickupSelect={(lat, lng) => {
-                    setPickupCoords({ lat, lng });
-                    setPickupFromMap(true);
-                    setBookingError(null);
-                    setBookingSuccessRideId(null);
-                  }}
+                  onPickupSelect={(lat, lng) => void resolveMapPickup(lat, lng)}
                 />
               </div>
             </div>

@@ -72,7 +72,7 @@ vi.mock('./JourneyPage', () => ({
       <button onClick={onDriverSignup}>Journey Driver Signup</button>
       <button
         onClick={() => onSelectPickup?.({
-          origin: 'Pinned pickup (51.38000, -2.36000)',
+          origin: 'Lower Bristol Road, Bath',
           pickupCoords: { lat: 51.38, lng: -2.36 },
         })}
       >
@@ -581,7 +581,7 @@ describe('App Component', () => {
       fireEvent.click(screen.getByText('Journey Select Pickup'));
 
       expect(screen.getByTestId('request-page')).toHaveTextContent(
-        'Prefill: Pinned pickup (51.38000, -2.36000) to undefined',
+        'Prefill: Lower Bristol Road, Bath to undefined',
       );
     });
   });

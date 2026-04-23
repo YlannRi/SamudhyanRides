@@ -4,6 +4,7 @@ test_pathfinder.py — Tests for app/pathfinder/service.py
 Functions tested:
   - calculate_route
   - geocode_address
+  - reverse_geocode
   - optimize_route
 """
 
@@ -11,7 +12,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
 from app.pathfinder.models import RouteRequest, Coordinate
-from app.pathfinder.service import calculate_route, geocode_address, optimize_route
+from app.pathfinder.service import calculate_route, geocode_address, optimize_route, reverse_geocode
 
 @pytest.fixture
 def mock_env_key():
@@ -96,6 +97,56 @@ class TestGeocodeAddress:
             geocode_address("Bath")
         assert exc.value.status_code == 502
         assert "ORS geocode error" in str(exc.value.detail)
+
+# ---------------------------------------------------------------------------
+# reverse_geocode
+# ---------------------------------------------------------------------------
+
+class TestReverseGeocode:
+
+    def test_missing_api_key(self, mock_env_no_key):
+        with pytest.raises(HTTPException) as exc:
+            reverse_geocode(51.38, -2.36)
+        assert exc.value.status_code == 500
+
+    @patch("app.pathfinder.service.requests.get")
+    def test_successful_reverse_geocode(self, mock_get, mock_env_key):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        mock_resp.json.return_value = {
+            "features": [
+                {
+                    "properties": {
+                        "street": "Lower Bristol Road",
+                        "locality": "Bath",
+                        "country_a": "GBR",
+                    },
+                    "geometry": {"coordinates": [-2.36, 51.38]}
+                }
+            ]
+        }
+        mock_get.return_value = mock_resp
+
+        res = reverse_geocode(51.38, -2.36)
+
+        assert res["label"] == "Lower Bristol Road, Bath"
+        assert res["lng"] == -2.36
+        assert res["lat"] == 51.38
+        mock_get.assert_called_once()
+        assert mock_get.call_args.kwargs["params"]["point.lat"] == 51.38
+        assert mock_get.call_args.kwargs["params"]["point.lon"] == -2.36
+
+    @patch("app.pathfinder.service.requests.get")
+    def test_reverse_geocode_api_error(self, mock_get, mock_env_key):
+        mock_resp = MagicMock()
+        mock_resp.ok = False
+        mock_resp.text = "Rate limit exceeded"
+        mock_get.return_value = mock_resp
+
+        with pytest.raises(HTTPException) as exc:
+            reverse_geocode(51.38, -2.36)
+        assert exc.value.status_code == 502
+        assert "ORS reverse geocode error" in str(exc.value.detail)
 
 # ---------------------------------------------------------------------------
 # optimize_route

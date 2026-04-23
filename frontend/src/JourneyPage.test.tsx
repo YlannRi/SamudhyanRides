@@ -8,8 +8,21 @@ const journeyMapMock = vi.hoisted(() => ({
   byRideId: new Map<number, unknown>(),
 }));
 
+const geocodeMocks = vi.hoisted(() => ({
+  reverseGeocode: vi.fn(),
+}));
+
 vi.mock('./lib/api', () => ({
   apiFetch: vi.fn(),
+}));
+
+vi.mock('./components/Map/useGeocode', () => ({
+  useGeocode: () => ({
+    geocodeAddress: vi.fn(),
+    reverseGeocode: geocodeMocks.reverseGeocode,
+    loading: false,
+    error: null,
+  }),
 }));
 
 vi.mock('./App', () => ({
@@ -194,6 +207,11 @@ describe('JourneyPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     journeyMapMock.byRideId.clear();
+    geocodeMocks.reverseGeocode.mockResolvedValue({
+      label: 'Lower Bristol Road, Bath',
+      lat: 51.38,
+      lng: -2.36,
+    });
   });
 
   afterEach(() => {
@@ -266,10 +284,13 @@ describe('JourneyPage', () => {
     await waitForJourneyLoad();
 
     fireEvent.click(screen.getByTestId('pickup-point-map'));
+    await waitFor(() => {
+      expect(screen.getByText('Pickup pin: Lower Bristol Road, Bath')).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Use selected pickup' }));
 
     expect(onSelectPickup).toHaveBeenCalledWith({
-      origin: 'Pinned pickup (51.38000, -2.36000)',
+      origin: 'Lower Bristol Road, Bath',
       pickupCoords: { lat: 51.38, lng: -2.36 },
     });
   });

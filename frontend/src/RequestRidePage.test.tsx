@@ -5,6 +5,7 @@ import { apiFetch } from './lib/api';
 
 const requestRideMocks = vi.hoisted(() => ({
   geocodeAddress: vi.fn(),
+  reverseGeocode: vi.fn(),
 }));
 
 vi.mock('./lib/api', () => ({
@@ -14,6 +15,7 @@ vi.mock('./lib/api', () => ({
 vi.mock('./components/Map/useGeocode', () => ({
   useGeocode: () => ({
     geocodeAddress: requestRideMocks.geocodeAddress,
+    reverseGeocode: requestRideMocks.reverseGeocode,
     loading: false,
     error: null,
   }),
@@ -61,6 +63,11 @@ describe('RequestRidePage', () => {
     requestRideMocks.geocodeAddress.mockResolvedValue([
       { label: 'Oldfield Park, Bath', lat: 51.381, lng: -2.36 },
     ]);
+    requestRideMocks.reverseGeocode.mockResolvedValue({
+      label: 'Lower Bristol Road, Bath',
+      lat: 51.38,
+      lng: -2.36,
+    });
     window.localStorage.clear();
     window.localStorage.setItem('authToken', 'fake-jwt-token');
   });
@@ -97,7 +104,7 @@ describe('RequestRidePage', () => {
     render(
       <RequestRidePage
         prefill={{
-          origin: 'Pinned pickup (51.38000, -2.36000)',
+          origin: 'Lower Bristol Road, Bath',
           pickupCoords: { lat: 51.38, lng: -2.36 },
         }}
       />,
@@ -163,7 +170,7 @@ describe('RequestRidePage', () => {
     expect(apiFetch).not.toHaveBeenCalled();
   });
 
-  it('submits the current pickup and destination as query params', async () => {
+  it('uses pickup for coordinates and searches available rides by destination', async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce([]);
 
     render(<RequestRidePage />);
@@ -177,9 +184,30 @@ describe('RequestRidePage', () => {
     await waitFor(() => {
       expect(requestRideMocks.geocodeAddress).toHaveBeenCalledWith('Oldfield Park');
       expect(apiFetch).toHaveBeenCalledWith(
-        'rides/?origin=Oldfield+Park&destination=University+of+Bath',
+        'rides/?destination=University+of+Bath',
         { method: 'GET' },
       );
+    });
+  });
+
+  it('does not hide rides when the typed pickup label is more specific than the ride origin', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce([searchResult]);
+
+    render(<RequestRidePage />);
+
+    fillPickup('Oldfield Park, Bath');
+    fireEvent.change(screen.getByLabelText('Destination'), {
+      target: { value: 'University of Bath' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Search Rides' }));
+
+    await waitFor(() => {
+      expect(apiFetch).toHaveBeenCalledWith(
+        'rides/?destination=University+of+Bath',
+        { method: 'GET' },
+      );
+      expect(screen.getByText('University of Bath')).toBeInTheDocument();
+      expect(screen.getByText('From: Oldfield Park')).toBeInTheDocument();
     });
   });
 
@@ -232,11 +260,15 @@ describe('RequestRidePage', () => {
     });
 
     fireEvent.click(screen.getByTestId('mock-map-101'));
+    await waitFor(() => {
+      expect(requestRideMocks.reverseGeocode).toHaveBeenCalledWith(51.38, -2.36);
+      expect(screen.getByText('Pickup: Lower Bristol Road, Bath')).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Request' }));
 
     await waitFor(() => {
       expect(apiFetch).toHaveBeenLastCalledWith(
-        'bookings/?ride_id=101&pickup_location=Oldfield+Park&dropoff_location=University+of+Bath&price=3.5&pickup_lat=51.38&pickup_lng=-2.36',
+        'bookings/?ride_id=101&pickup_location=Lower+Bristol+Road%2C+Bath&dropoff_location=University+of+Bath&price=3.5&pickup_lat=51.38&pickup_lng=-2.36',
         { method: 'POST' },
       );
       expect(screen.getByText('Booking request sent successfully!')).toBeInTheDocument();
@@ -260,7 +292,7 @@ describe('RequestRidePage', () => {
 
     await waitFor(() => {
       expect(apiFetch).toHaveBeenLastCalledWith(
-        'bookings/?ride_id=101&pickup_location=Oldfield+Park&dropoff_location=University+of+Bath&price=3.5&pickup_lat=51.381&pickup_lng=-2.36',
+        'bookings/?ride_id=101&pickup_location=Oldfield+Park%2C+Bath&dropoff_location=University+of+Bath&price=3.5&pickup_lat=51.381&pickup_lng=-2.36',
         { method: 'POST' },
       );
     });

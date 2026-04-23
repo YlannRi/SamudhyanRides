@@ -65,6 +65,23 @@ class TestGeocodeAddress:
 
 
 # ---------------------------------------------------------------------------
+# GET /routing/reverse-geocode
+# ---------------------------------------------------------------------------
+
+class TestReverseGeocode:
+
+    def test_reverse_geocodes_successfully(self, client):
+        fake_response = {"label": "Lower Bristol Road, Bath", "lat": 51.38, "lng": -2.36}
+
+        with patch("app.routers.routing.reverse_geocode", return_value=fake_response) as mock_reverse:
+            response = client.get("/routing/reverse-geocode", params={"lat": 51.38, "lng": -2.36})
+
+        assert response.status_code == 200
+        assert response.json()["label"] == "Lower Bristol Road, Bath"
+        mock_reverse.assert_called_once_with(51.38, -2.36)
+
+
+# ---------------------------------------------------------------------------
 # GET /routing/ride/{ride_id}
 # ---------------------------------------------------------------------------
 

@@ -92,4 +92,52 @@ describe('useGeocode', () => {
 
     consoleSpy.mockRestore();
   });
+
+  it('returns the closest address for reverse geocoded coordinates', async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({
+      label: 'Lower Bristol Road, Bath',
+      lat: 51.38,
+      lng: -2.36,
+    });
+
+    const { result } = renderHook(() => useGeocode());
+    let reverseResult: Awaited<ReturnType<typeof result.current.reverseGeocode>> = null;
+
+    await act(async () => {
+      reverseResult = await result.current.reverseGeocode(51.38, -2.36);
+    });
+
+    expect(apiFetch).toHaveBeenCalledWith('/routing/reverse-geocode?lat=51.38&lng=-2.36', { method: 'GET' });
+    expect(reverseResult).toEqual({
+      label: 'Lower Bristol Road, Bath',
+      lat: 51.38,
+      lng: -2.36,
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('stores an error and rethrows when reverse geocoding fails', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failure = new Error('Reverse geocoder offline');
+    vi.mocked(apiFetch).mockRejectedValueOnce(failure);
+
+    const { result } = renderHook(() => useGeocode());
+    let thrown: unknown;
+
+    await act(async () => {
+      try {
+        await result.current.reverseGeocode(51.38, -2.36);
+      } catch (error) {
+        thrown = error;
+      }
+    });
+
+    expect(thrown).toBe(failure);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.error).toBe('Reverse geocoder offline');
+    expect(consoleSpy).toHaveBeenCalledWith('Error during reverse geocoding:', failure);
+
+    consoleSpy.mockRestore();
+  });
 });

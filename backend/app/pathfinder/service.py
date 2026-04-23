@@ -65,6 +65,55 @@ def geocode_address(q: str) -> list:
     return valid_results
 
 
+def _format_location_label(props: dict) -> str:
+    house_number = props.get("housenumber")
+    street = props.get("street")
+    street_address = " ".join(part for part in [house_number, street] if part)
+    primary = props.get("name") or street_address or props.get("label")
+    locality = props.get("locality") or props.get("localadmin") or props.get("county")
+    postcode = props.get("postalcode")
+
+    parts = []
+    for value in [primary, locality, postcode]:
+        if value and value not in parts:
+            parts.append(value)
+
+    return ", ".join(parts) or "Selected map pickup"
+
+
+def reverse_geocode(lat: float, lng: float) -> dict:
+    api_key = os.getenv("OPENROUTE_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="API key not found")
+
+    response = requests.get(
+        "https://api.openrouteservice.org/geocode/reverse",
+        params={"api_key": api_key, "point.lat": lat, "point.lon": lng, "size": 1}
+    )
+    if not response.ok:
+        raise HTTPException(status_code=502, detail=f"ORS reverse geocode error: {response.text}")
+
+    data = response.json()
+    features = data.get("features", [])
+    if not features:
+        raise HTTPException(status_code=404, detail="Address not found")
+
+    for feature in features:
+        props = feature.get("properties", {})
+        country = props.get("country_a")
+        if country and country != "GBR":
+            continue
+
+        coords = feature.get("geometry", {}).get("coordinates", [lng, lat])
+        return {
+            "label": _format_location_label(props),
+            "lng": coords[0],
+            "lat": coords[1],
+        }
+
+    raise HTTPException(status_code=400, detail="Location must be in the United Kingdom")
+
+
 def optimize_route(origin: Coordinate, destination: Coordinate, pickups: List[Coordinate]) -> List[Coordinate]:
     api_key = os.getenv("OPENROUTE_KEY")
     if not api_key:

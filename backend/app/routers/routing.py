@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from app.pathfinder.models import RouteRequest, Coordinate
-from app.pathfinder.service import calculate_route, geocode_address, optimize_route
+from app.pathfinder.service import calculate_route, geocode_address, optimize_route, reverse_geocode
 from app.accounts.database import supabase
 
 router = APIRouter(prefix="/routing", tags=["routing"])
@@ -28,6 +28,13 @@ async def test_bath_route():
 @router.get("/geocode")
 async def geocode_address_endpoint(q: str = Query(..., description="Address or place name")):
     return geocode_address(q)
+
+@router.get("/reverse-geocode")
+async def reverse_geocode_endpoint(
+    lat: float = Query(..., description="Pickup latitude"),
+    lng: float = Query(..., description="Pickup longitude"),
+):
+    return reverse_geocode(lat, lng)
 
 # get ORS GeoJSON route for a ride
 @router.get("/ride/{ride_id}")

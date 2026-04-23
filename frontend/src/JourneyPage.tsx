@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './JourneyPage.css';
 import { DetailRow, Icons } from './App';
 import { Btn } from './App.tsx';
 import { RideRenderMap } from './components/Map/RideRenderMap';
 import { PickupPointMap } from './components/Map/PickupPointMap';
+import { useGeocode } from './components/Map/useGeocode';
 import { apiFetch } from './lib/api';
 
 type PickupCoords = {
@@ -16,9 +17,7 @@ type PickupPrefill = {
   pickupCoords: PickupCoords;
 };
 
-const formatPinnedPickupLabel = ({ lat, lng }: PickupCoords) => (
-  `Pinned pickup (${lat.toFixed(5)}, ${lng.toFixed(5)})`
-);
+const MAP_PICKUP_FALLBACK = 'Selected map pickup';
 
 
 // User Journey View
@@ -30,6 +29,32 @@ const UserJourney: React.FC<{
   const [activeTripIdx, setActiveTripIdx] = useState(0);
   const [routeData, setRouteData] = useState<any>(null);
   const [selectedPickup, setSelectedPickup] = useState<PickupCoords | null>(null);
+  const [selectedPickupLabel, setSelectedPickupLabel] = useState('');
+  const [isResolvingPickup, setIsResolvingPickup] = useState(false);
+  const pickupLookupId = useRef(0);
+  const { reverseGeocode } = useGeocode();
+
+  const handlePickupSelect = async (lat: number, lng: number) => {
+    const lookupId = pickupLookupId.current + 1;
+    pickupLookupId.current = lookupId;
+
+    setSelectedPickup({ lat, lng });
+    setSelectedPickupLabel('');
+    setIsResolvingPickup(true);
+
+    try {
+      const result = await reverseGeocode(lat, lng);
+      if (lookupId !== pickupLookupId.current) return;
+      setSelectedPickupLabel(result?.label?.trim() || MAP_PICKUP_FALLBACK);
+    } catch {
+      if (lookupId !== pickupLookupId.current) return;
+      setSelectedPickupLabel(MAP_PICKUP_FALLBACK);
+    } finally {
+      if (lookupId === pickupLookupId.current) {
+        setIsResolvingPickup(false);
+      }
+    }
+  };
 
   if (trips.length === 0) {
     return (
@@ -44,22 +69,24 @@ const UserJourney: React.FC<{
           <PickupPointMap
             height="280px"
             initialPickup={selectedPickup ?? undefined}
-            onPickupSelect={(lat, lng) => setSelectedPickup({ lat, lng })}
+            onPickupSelect={(lat, lng) => void handlePickupSelect(lat, lng)}
           />
         </div>
 
         <div className="journey-empty-selection">
-          {selectedPickup ? `Pickup pin: ${formatPinnedPickupLabel(selectedPickup)}` : 'Tap the map to place a pickup pin.'}
+          {selectedPickup
+            ? `Pickup pin: ${isResolvingPickup ? 'Finding closest address...' : selectedPickupLabel || MAP_PICKUP_FALLBACK}`
+            : 'Tap the map to place a pickup pin.'}
         </div>
 
         <button
           type="button"
           className="sheet-action-btn btn-accept"
-          disabled={!selectedPickup}
+          disabled={!selectedPickup || isResolvingPickup}
           onClick={() => {
             if (!selectedPickup) return;
             onSelectPickup?.({
-              origin: formatPinnedPickupLabel(selectedPickup),
+              origin: selectedPickupLabel || MAP_PICKUP_FALLBACK,
               pickupCoords: selectedPickup,
             });
           }}
