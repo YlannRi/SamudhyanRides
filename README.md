@@ -302,8 +302,11 @@ Set these GitHub repository or environment variables for the backend deploy work
 - `PRODUCTION_FRONTEND_URL` (optional if you keep `https://samudhyanrides.vercel.app`)
 - `PRODUCTION_BACKEND_URL` (optional if you keep `https://samudhyanrides-api.purplerock-a57ae792.francecentral.azurecontainerapps.io`)
 
-Set this GitHub secret for backend deployment:
+Set one of these GitHub secret configurations for backend deployment:
 
 - `AZURE_CREDENTIALS`
+  The value must be JSON with `clientId`, `clientSecret`, `subscriptionId`, and `tenantId`.
+- Or these four secrets:
+  `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`
 
 For the Vercel-triggered smoke workflow, make sure the Vercel project is connected to this GitHub repository so `repository_dispatch` deployment events are delivered to GitHub Actions.

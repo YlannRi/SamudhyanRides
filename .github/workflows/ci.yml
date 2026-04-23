@@ -251,10 +251,102 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate Azure login configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "${AZURE_CREDENTIALS:-}" ]; then
+            python - <<'PY'
+import json
+import os
+import sys
+
+raw = os.environ.get("AZURE_CREDENTIALS", "").strip()
+try:
+    data = json.loads(raw)
+except json.JSONDecodeError as exc:
+    print(f"::error title=Invalid AZURE_CREDENTIALS::AZURE_CREDENTIALS must be valid JSON. {exc}")
+    sys.exit(1)
+
+required = ["clientId", "clientSecret", "subscriptionId", "tenantId"]
+missing = [key for key in required if not data.get(key)]
+if missing:
+    print(
+        "::error title=Invalid AZURE_CREDENTIALS::"
+        "AZURE_CREDENTIALS must include clientId, clientSecret, subscriptionId, and tenantId. "
+        f"Missing: {', '.join(missing)}."
+    )
+    sys.exit(1)
+PY
+          else
+            missing=0
+            for key in AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_SUBSCRIPTION_ID AZURE_TENANT_ID; do
+              if [ -z "${!key:-}" ]; then
+                echo "::error title=Missing Azure login secret::$key is required when AZURE_CREDENTIALS is not set."
+                missing=1
+              fi
+            done
+
+            if [ "$missing" -ne 0 ]; then
+              exit 1
+            fi
+          fi
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Prepare Azure login credentials
+        id: azure-creds
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "${AZURE_CREDENTIALS:-}" ]; then
+            python - <<'PY'
+import json
+import os
+
+raw = os.environ["AZURE_CREDENTIALS"].strip()
+data = json.loads(raw)
+payload = {
+    "clientId": data["clientId"],
+    "clientSecret": data["clientSecret"],
+    "subscriptionId": data["subscriptionId"],
+    "tenantId": data["tenantId"],
+}
+with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+    fh.write(f"creds={json.dumps(payload, separators=(',', ':'))}\n")
+PY
+          else
+            python - <<'PY'
+import json
+import os
+
+payload = {
+    "clientId": os.environ["AZURE_CLIENT_ID"],
+    "clientSecret": os.environ["AZURE_CLIENT_SECRET"],
+    "subscriptionId": os.environ["AZURE_SUBSCRIPTION_ID"],
+    "tenantId": os.environ["AZURE_TENANT_ID"],
+}
+with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+    fh.write(f"creds={json.dumps(payload, separators=(',', ':'))}\n")
+PY
+          fi
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
       - name: Log in to Azure
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: ${{ steps.azure-creds.outputs.creds }}
 
       - name: Log in to Azure Container Registry
         uses: azure/docker-login@v1
