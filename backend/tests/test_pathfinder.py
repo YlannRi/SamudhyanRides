@@ -12,7 +12,13 @@ import pytest
 from unittest.mock import patch, MagicMock
 from fastapi import HTTPException
 from app.pathfinder.models import RouteRequest, Coordinate
-from app.pathfinder.service import calculate_route, geocode_address, optimize_route, reverse_geocode
+from app.pathfinder.service import (
+    NOMINATIM_REVERSE_URL,
+    calculate_route,
+    geocode_address,
+    optimize_route,
+    reverse_geocode,
+)
 
 @pytest.fixture
 def mock_env_key():
@@ -104,10 +110,30 @@ class TestGeocodeAddress:
 
 class TestReverseGeocode:
 
-    def test_missing_api_key(self, mock_env_no_key):
-        with pytest.raises(HTTPException) as exc:
-            reverse_geocode(51.38, -2.36)
-        assert exc.value.status_code == 500
+    @patch("app.pathfinder.service.requests.get")
+    def test_missing_api_key_falls_back_to_nominatim(self, mock_get, mock_env_no_key):
+        mock_resp = MagicMock()
+        mock_resp.ok = True
+        mock_resp.json.return_value = {
+            "lat": "51.38",
+            "lon": "-2.36",
+            "address": {
+                "house_number": "6",
+                "road": "Dorchester Street",
+                "city": "Bath",
+                "postcode": "BA1 1AT",
+                "country_code": "gb",
+            },
+            "display_name": "6 Dorchester Street, Bath BA1 1AT, United Kingdom",
+        }
+        mock_get.return_value = mock_resp
+
+        res = reverse_geocode(51.38, -2.36)
+
+        assert res["label"] == "6 Dorchester Street, Bath, BA1 1AT"
+        assert res["lng"] == -2.36
+        assert res["lat"] == 51.38
+        assert NOMINATIM_REVERSE_URL in mock_get.call_args.args[0]
 
     @patch("app.pathfinder.service.requests.get")
     def test_successful_reverse_geocode(self, mock_get, mock_env_key):
@@ -137,16 +163,53 @@ class TestReverseGeocode:
         assert mock_get.call_args.kwargs["params"]["point.lon"] == -2.36
 
     @patch("app.pathfinder.service.requests.get")
+    def test_reverse_geocode_falls_back_when_ors_label_is_too_generic(self, mock_get, mock_env_key):
+        ors_resp = MagicMock()
+        ors_resp.ok = True
+        ors_resp.json.return_value = {
+            "features": [
+                {
+                    "properties": {"country_a": "GBR"},
+                    "geometry": {"coordinates": [-2.36, 51.38]},
+                }
+            ]
+        }
+        nominatim_resp = MagicMock()
+        nominatim_resp.ok = True
+        nominatim_resp.json.return_value = {
+            "lat": "51.38",
+            "lon": "-2.36",
+            "address": {
+                "house_number": "6",
+                "road": "Dorchester Street",
+                "city": "Bath",
+                "postcode": "BA1 1AT",
+                "country_code": "gb",
+            },
+            "display_name": "6 Dorchester Street, Bath BA1 1AT, United Kingdom",
+        }
+        mock_get.side_effect = [ors_resp, nominatim_resp]
+
+        res = reverse_geocode(51.38, -2.36)
+
+        assert res["label"] == "6 Dorchester Street, Bath, BA1 1AT"
+        assert mock_get.call_count == 2
+
+    @patch("app.pathfinder.service.requests.get")
     def test_reverse_geocode_api_error(self, mock_get, mock_env_key):
-        mock_resp = MagicMock()
-        mock_resp.ok = False
-        mock_resp.text = "Rate limit exceeded"
-        mock_get.return_value = mock_resp
+        ors_resp = MagicMock()
+        ors_resp.ok = False
+        ors_resp.status_code = 429
+        ors_resp.text = "Rate limit exceeded"
+        nominatim_resp = MagicMock()
+        nominatim_resp.ok = False
+        nominatim_resp.text = "Service unavailable"
+        mock_get.side_effect = [ors_resp, nominatim_resp]
 
         with pytest.raises(HTTPException) as exc:
             reverse_geocode(51.38, -2.36)
         assert exc.value.status_code == 502
-        assert "ORS reverse geocode error" in str(exc.value.detail)
+        assert "Nominatim reverse geocode error" in str(exc.value.detail)
 
 # ---------------------------------------------------------------------------
 # optimize_route
