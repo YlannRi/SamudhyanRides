@@ -258,6 +258,14 @@ The ramp runner writes:
 - `backend_perf_ramp_summary.json`
 - `backend_perf_ramp_summary.md`
 
+To generate a combined performance graph (Users on X-axis, Latency and Throughput on Y-axes):
+
+`npm run perf:backend:graph`
+
+This writes:
+
+- `backend/perf/results/ramp/backend_perf_ramp_graph.png`
+
 These show every stage that ran and the first user level where failure rate crossed the configured threshold.
 
 ### Thresholds

@@ -1,9 +1,49 @@
 import React, { useEffect, useState } from 'react';
 import { apiFetch } from './lib/api';
 import { RideRenderMap } from './components/Map/RideRenderMap';
+import { useGeocode } from './components/Map/useGeocode';
 
-export type RequestRidePrefill = { destination?: string; arrivalDateTimeLocal?: string; };
-type Ride = { id: number; origin?: string; destination?: string; departure_time?: string; dateOnly?: string; timeOnly?: string; driver_name?: string;driver_rating?: number; price?: string; };
+export type RequestRidePrefill = {
+  origin?: string;
+  destination?: string;
+  arrivalDateTimeLocal?: string;
+};
+
+type Ride = {
+  id: number;
+  origin?: string;
+  destination?: string;
+  departure_time?: string;
+  dateOnly?: string;
+  timeOnly?: string;
+  driver_name?: string;
+  driver_rating?: number;
+  price?: string;
+};
+
+type PickupCoords = {
+  lat: number;
+  lng: number;
+};
+
+const CarIcon = () => (
+  <svg
+    aria-hidden="true"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M5 17h14l-1.5-6h-11L5 17Z" />
+    <path d="M7 11l1.5-4h7L17 11" />
+    <circle cx="7.5" cy="17.5" r="1.5" />
+    <circle cx="16.5" cy="17.5" r="1.5" />
+  </svg>
+);
 
 const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }) => {
   const [rides, setRides] = useState<Ride[]>([]);
@@ -11,117 +51,237 @@ const RequestRidePage: React.FC<{ prefill?: RequestRidePrefill }> = ({ prefill }
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const [originInput, setOriginInput] = useState('');
+  const [pickupInput, setPickupInput] = useState('');
+  const [pickupLabel, setPickupLabel] = useState('');
+  const [pickupCoords, setPickupCoords] = useState<PickupCoords | null>(null);
   const [destinationInput, setDestinationInput] = useState('');
   const [timeInput, setTimeInput] = useState('');
 
+  const [bookingLoadingRideId, setBookingLoadingRideId] = useState<number | null>(null);
+  const [bookingError, setBookingError] = useState<{ rideId: number; message: string } | null>(null);
+  const [bookingSuccessRideId, setBookingSuccessRideId] = useState<number | null>(null);
+
+  const { geocodeAddress } = useGeocode();
+
   useEffect(() => {
     if (!prefill) return;
+    if (prefill.origin) setPickupInput(prefill.origin);
     if (prefill.destination) setDestinationInput(prefill.destination);
     if (prefill.arrivalDateTimeLocal) setTimeInput(prefill.arrivalDateTimeLocal);
   }, [prefill]);
 
-  const [selectedRide, setSelectedRide] = useState<Ride | null>(null);
-  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [bookingLoading, setBookingLoading] = useState(false);
-  const [bookingError, setBookingError] = useState<string | null>(null);
-  const [bookingSuccess, setBookingSuccess] = useState(false);
+  const clearBrowseResults = () => {
+    setRides([]);
+    setHasSearched(false);
+    setError(null);
+    setBookingError(null);
+    setBookingSuccessRideId(null);
+  };
 
-  const handleSearch = async () => {
-    setLoading(true); setError(null); setHasSearched(true); setSelectedRide(null);
+  const handlePickupChange = (value: string) => {
+    setPickupInput(value);
+    setPickupCoords(null);
+    setPickupLabel('');
+    clearBrowseResults();
+  };
+
+  const handleSearch = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+    setLoading(true);
+    setError(null);
+    setHasSearched(true);
+    setBookingError(null);
+    setBookingSuccessRideId(null);
+
     try {
       const token = localStorage.getItem('authToken');
       if (!token) throw new Error('No authentication token found. Please log in again.');
+
+      const pickup = pickupInput.trim();
+      if (!pickup) throw new Error('Enter a pickup location before browsing rides.');
+
+      const pickupResults = await geocodeAddress(pickup);
+      const nextPickup = pickupResults[0];
+      if (!nextPickup) throw new Error('Pickup location not found.');
+
+      setPickupCoords({ lat: nextPickup.lat, lng: nextPickup.lng });
+      setPickupLabel(nextPickup.label || pickup);
+
       const params = new URLSearchParams();
-      if (originInput.trim()) params.append('origin', originInput.trim());
+      params.append('origin', pickup);
       if (destinationInput.trim()) params.append('destination', destinationInput.trim());
 
-      const data = await apiFetch<Ride[]>(params.toString() ? `rides/?${params.toString()}` : 'rides/', { method: 'GET' });
+      const data = await apiFetch<Ride[]>(`rides/?${params.toString()}`, { method: 'GET' });
       setRides(Array.isArray(data) ? data : []);
-    } catch (err: unknown) { setError(err instanceof Error ? err.message : String(err)); } finally { setLoading(false); }
+    } catch (err: unknown) {
+      setRides([]);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleBookRide = async () => {
-    if (!selectedRide) return;
-    setBookingLoading(true); setBookingError(null); setBookingSuccess(false);
+  const handleBookRide = async (ride: Ride) => {
+    setBookingLoadingRideId(ride.id);
+    setBookingError(null);
+    setBookingSuccessRideId(null);
+
     try {
-      const numericPrice = parseFloat((selectedRide.price ?? '0').replace(/[\u00A3$,]/g, '') || '0');
+      const pickupLocation = pickupInput.trim();
+      if (!pickupLocation) throw new Error('Enter a pickup location before requesting this ride.');
+
+      const numericPrice = parseFloat((ride.price ?? '0').replace(/[\u00A3$,]/g, '') || '0');
       const params = new URLSearchParams({
-        ride_id: String(selectedRide.id), pickup_location: 'Map Point',
-        dropoff_location: selectedRide.destination || 'Destination', price: String(Number.isFinite(numericPrice) ? numericPrice : 0),
+        ride_id: String(ride.id),
+        pickup_location: pickupLocation,
+        dropoff_location: ride.destination || 'Destination',
+        price: String(Number.isFinite(numericPrice) ? numericPrice : 0),
       });
-      if (pickupCoords) { params.append('pickup_lat', String(pickupCoords.lat)); params.append('pickup_lng', String(pickupCoords.lng)); }
+
+      if (pickupCoords) {
+        params.append('pickup_lat', String(pickupCoords.lat));
+        params.append('pickup_lng', String(pickupCoords.lng));
+      }
+
       await apiFetch(`bookings/?${params.toString()}`, { method: 'POST' });
-      setBookingSuccess(true);
-    } catch (err: unknown) { setBookingError(err instanceof Error ? err.message : String(err)); } finally { setBookingLoading(false); }
+      setBookingSuccessRideId(ride.id);
+    } catch (err: unknown) {
+      setBookingError({ rideId: ride.id, message: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setBookingLoadingRideId(null);
+    }
   };
 
-  if (selectedRide) {
-    return (
-      <div style={{ width: '100%' }}>
-        <header className="uber-header" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button type="button" onClick={() => { setSelectedRide(null); setPickupCoords(null); setBookingError(null); setBookingSuccess(false); }} style={{ background: 'none', border: 'none', color: 'var(--text-header)', fontSize: '20px', padding: 0 }}>←</button>
-          <h1 className="activity-title" style={{ margin: 0, color: 'var(--text-header)' }}>{selectedRide.destination ? `Book Ride to ${selectedRide.destination}` : 'Book Ride'}</h1>
-        </header>
-        <div className="auth-card">
-          <h3 style={{ marginTop: 0, color: 'var(--text-typed)' }}>Select Pickup Location</h3>
-          <p style={{ fontSize: '14px', color: 'var(--text-label)', marginBottom: '16px' }}>Click on the map to set your exact pickup spot.</p>
-          <RideRenderMap rideId={selectedRide.id} height="350px" onPickupSelect={(lat, lng) => setPickupCoords({ lat, lng })} />
-          <div style={{ marginTop: '20px' }}>
-            {bookingError && <p style={{ color: '#d32f2f', fontSize: '14px', fontWeight: 'bold' }}>{bookingError}</p>}
-            {bookingSuccess && <p className="auth-alert-success">Booking request sent successfully!</p>}
-            <button className="auth-submit" onClick={handleBookRide} disabled={bookingLoading || bookingSuccess} style={{ opacity: bookingLoading || bookingSuccess ? 0.7 : 1 }}>
-              {bookingLoading ? 'Requesting...' : pickupCoords ? 'Confirm Pickup & Request' : 'Request Without Specific Pickup'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const formatDateOnly = (iso?: string) => iso ? new Date(iso).toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Flexible';
-  const formatTimeOnly = (iso?: string) => iso ? new Date(iso).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+  const formatDateOnly = (iso?: string) => (
+    iso ? new Date(iso).toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : 'Flexible'
+  );
+  const formatTimeOnly = (iso?: string) => (
+    iso ? new Date(iso).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''
+  );
 
   return (
     <div style={{ width: '100%' }}>
-      <header className="uber-header"><h1 className="activity-title" style={{ color: 'var(--text-header)' }}>Request a Ride</h1></header>
+      <header className="uber-header">
+        <h1 className="activity-title" style={{ color: 'var(--text-header)' }}>Request a Ride</h1>
+      </header>
+
       <div className="auth-card" style={{ marginBottom: '24px' }}>
-        <div className="auth-field">
-          <label className="auth-label" htmlFor="pickup-area">Pick-up area (optional)</label>
-          <input id="pickup-area" type="text" className="auth-input" style={{ colorScheme: 'light' }} placeholder="e.g. Oldfield Park" value={originInput} onChange={(e) => setOriginInput(e.target.value)} />
-        </div>
-        <div className="auth-field">
-          <label className="auth-label" htmlFor="destination-input">Destination</label>
-          <input id="destination-input" type="text" className="auth-input" style={{ colorScheme: 'light' }} placeholder="e.g. University of Bath" value={destinationInput} onChange={(e) => setDestinationInput(e.target.value)} />
-        </div>
-        <div className="auth-field">
-          <label className="auth-label" htmlFor="arrival-time">Time of arrival (optional)</label>
-          <input id="arrival-time" type="datetime-local" className="auth-input" style={{ colorScheme: 'light' }} value={timeInput} onChange={(e) => setTimeInput(e.target.value)} />
-        </div>
-        <button className="auth-submit" onClick={handleSearch} disabled={loading} style={{ marginTop: '12px' }}>{loading ? 'Searching...' : 'Search Rides'}</button>
+        <form onSubmit={handleSearch}>
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="pickup-area">Pickup location</label>
+            <input
+              id="pickup-area"
+              type="text"
+              className="auth-input"
+              style={{ colorScheme: 'light' }}
+              placeholder="e.g. Oldfield Park"
+              value={pickupInput}
+              onChange={(e) => handlePickupChange(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="destination-input">Destination</label>
+            <input
+              id="destination-input"
+              type="text"
+              className="auth-input"
+              style={{ colorScheme: 'light' }}
+              placeholder="e.g. University of Bath"
+              value={destinationInput}
+              onChange={(e) => {
+                setDestinationInput(e.target.value);
+                clearBrowseResults();
+              }}
+            />
+          </div>
+
+          <div className="auth-field">
+            <label className="auth-label" htmlFor="arrival-time">Time of arrival (optional)</label>
+            <input
+              id="arrival-time"
+              type="datetime-local"
+              className="auth-input"
+              style={{ colorScheme: 'light' }}
+              value={timeInput}
+              onChange={(e) => setTimeInput(e.target.value)}
+            />
+          </div>
+
+          {pickupCoords && (
+            <div className="request-pickup-status">
+              Pickup set: {pickupLabel || pickupInput}
+            </div>
+          )}
+
+          <button type="submit" className="auth-submit" disabled={loading} style={{ marginTop: '12px' }}>
+            {loading ? 'Searching...' : 'Search Rides'}
+          </button>
+        </form>
       </div>
+
       {error && <p style={{ color: '#d32f2f', fontWeight: 'bold' }}>{error}</p>}
+
       {!loading && !error && hasSearched && rides.length > 0 && (
-        <div className="past-list">
+        <div className="ride-results-list">
           {rides.map((ride) => (
-            <div key={ride.id} className="card trip-row-card">
-              <div className="trip-row-left">
-                <div className="trip-car-icon">🚗</div>
-                <div className="trip-row-text">
+            <div key={ride.id} className="card ride-result-card">
+              <div className="ride-result-details">
+                <div className="trip-car-icon"><CarIcon /></div>
+                <div className="trip-row-text ride-result-copy">
                   <div className="trip-row-title">{ride.destination || `Ride #${ride.id}`}</div>
                   <div className="trip-row-meta">{formatDateOnly(ride.departure_time)}</div>
                   {ride.departure_time && <div className="trip-row-meta">{formatTimeOnly(ride.departure_time)}</div>}
-                  <div className="trip-row-meta">From: {ride.origin || '—'}</div>
+                  <div className="trip-row-meta">From: {ride.origin || '-'}</div>
+                  <div className="trip-row-meta">Pickup: {pickupLabel || pickupInput}</div>
                   {ride.driver_name && <div className="trip-row-meta">Driver: {ride.driver_name}</div>}
                   {ride.driver_rating !== undefined && ride.driver_rating > 0 && (
-                    <div className="trip-row-meta">⭐ {ride.driver_rating.toFixed(1)}</div>
+                    <div className="trip-row-meta">Rating: {ride.driver_rating.toFixed(1)}</div>
                   )}
-                  <div className="trip-row-price" style={{ color: 'var(--text-label)', fontWeight: 'bold' }}>{'£2.00'}</div>
+                  <div className="trip-row-price" style={{ color: 'var(--text-label)', fontWeight: 'bold' }}>
+                    GBP 2.00
+                  </div>
+                  {bookingError?.rideId === ride.id && (
+                    <p className="request-booking-error">{bookingError.message}</p>
+                  )}
+                  {bookingSuccessRideId === ride.id && (
+                    <p className="auth-alert-success request-booking-success">Booking request sent successfully!</p>
+                  )}
+                  <button
+                    type="button"
+                    className="pill pill-solid ride-result-request"
+                    onClick={() => void handleBookRide(ride)}
+                    disabled={bookingLoadingRideId === ride.id || bookingSuccessRideId === ride.id}
+                  >
+                    {bookingLoadingRideId === ride.id ? 'Requesting...' : bookingSuccessRideId === ride.id ? 'Requested' : 'Request'}
+                  </button>
                 </div>
               </div>
-              <button className="pill pill-solid" onClick={() => { setSelectedRide(ride); setPickupCoords(null); setBookingError(null); setBookingSuccess(false); }}>Request</button>
+
+              <div className="ride-result-map" aria-label={`Route map for ${ride.destination || `Ride #${ride.id}`}`}>
+                <RideRenderMap
+                  rideId={ride.id}
+                  height="180px"
+                  existingPickup={pickupCoords ?? undefined}
+                  onPickupSelect={(lat, lng) => {
+                    setPickupCoords({ lat, lng });
+                    setBookingError(null);
+                    setBookingSuccessRideId(null);
+                  }}
+                />
+              </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {!loading && !error && hasSearched && rides.length === 0 && (
+        <div className="card activity-upcoming-card">
+          <div>
+            <div className="activity-upcoming-title">No rides found</div>
+            <div className="activity-upcoming-subtitle">Try a nearby pickup area or a different destination.</div>
+          </div>
         </div>
       )}
     </div>
