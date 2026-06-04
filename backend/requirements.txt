@@ -1,7 +1,7 @@
 email-validator>=2.2,<3
 fastapi==0.132.0
 httpx==0.28.1
-icalendar==7.0.2
+icalendar==7.0.3
 openapi-spec-validator>=0.7,<0.8
 postgrest==2.24.0
 pydantic==2.12.4
