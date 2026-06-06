@@ -6,7 +6,7 @@ openapi-spec-validator>=0.7,<0.8
 postgrest==2.24.0
 pydantic==2.12.4
 python-dateutil==2.9.0.post0
-python-dotenv==1.2.1
+python-dotenv==1.2.2
 requests==2.32.5
 stripe>=12,<14
 supabase==2.24.0
